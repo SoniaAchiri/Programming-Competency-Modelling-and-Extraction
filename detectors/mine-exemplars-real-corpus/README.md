@@ -3,8 +3,8 @@
 *Note (2026-09-21): the `/home/claude/refactory/...` path below is the historical record of what this
 round's script actually hardcoded and what this project's own sandbox checked for — not something to
 run against today. The checked-in `mine_exemplars.py` in this repository now resolves the corpus location
-portably (`REFACTORY_ROOT` env var, or a path relative to the script's own location); see
-`provenance/detector-version-log.md`, "Hardcoded `/home/claude/refactory` sandbox path made portable."*
+portably (`REFACTORY_ROOT` env var, or a path relative to the script's own location); see this
+repository's git history for the full writeup of that portability change.*
 
 Sonia's message: "A second version is here," uploading four files as a follow-up to the first
 mine_exemplars delivery (`../mine-exemplars/`): a second dev-session conversation transcript

@@ -3,8 +3,8 @@
 *Note (2026-09-21): the `/home/claude/refactory` path below is the historical record of what this round's
 script actually hardcoded and what this project's own sandbox checked for — not something to run against
 today. The checked-in `mine_exemplars.py` in this repository now resolves the corpus location portably
-(`REFACTORY_ROOT` env var, or a path relative to the script's own location); see
-`provenance/detector-version-log.md`, "Hardcoded `/home/claude/refactory` sandbox path made portable."*
+(`REFACTORY_ROOT` env var, or a path relative to the script's own location); see this repository's git
+history for the full writeup of that portability change.*
 
 Sonia's message: "here are a version of files," uploading `files_semantic_mine_factory.zip`
 (`mine_exemplars.py`, `semantic_backup.py`, `validate_semantic_backup.py`,
