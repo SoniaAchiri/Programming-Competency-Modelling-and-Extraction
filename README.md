@@ -13,8 +13,10 @@ stage so each number is independently regenerable and attributable to a specific
 
 **A note on provenance:** there is no granular commit history for this project — real checkpoints were
 saved periodically (zips, standalone files), not committed incrementally. Every claim in this repository
-is sourced from `provenance/detector-version-log.md`, an evidence-grounded log built by diffing those real
-checkpoints against each other and cross-referencing conversation-history exports and paper drafts. Checkpoint
+is sourced from `provenance/detector-version-log.md`, an evidence-grounded audit index built by diffing
+those real checkpoints against each other and cross-referencing conversation-history exports and paper
+drafts — condensed to a chronological index plus the canonical bug table; the full development-process
+narrative it was distilled from remains available in this repository's git history. Checkpoint
 folders are named with a **stable, date-free label** (Sonia's own label for that checkpoint, e.g.
 `fixq4`) rather than an invented version ladder — real dates are never guessed, and live instead in each
 checkpoint's own `README.md`/`taxonomy.yaml`, in `detectors/CHANGELOG.md`/`taxonomy/CHANGELOG.md`'s own
@@ -42,7 +44,7 @@ verification that nothing was lost in the change.)
 | `scripts/` | Regeneration scripts. Each reads `stage_manifest.yaml` and either recomputes a real figure or reports `[PENDING]` honestly rather than crashing or guessing. |
 | `tests/` | Regression tests — pass where real data exists, skip/fail-loudly where it doesn't (by design, not a bug). |
 | `docs/` | Data dictionary and schema documentation for everything under `data/`. |
-| `provenance/detector-version-log.md` | **The actual audit trail** — every claim in this repository traces back to a specific diff, conversation quote, or paper passage recorded here. |
+| `provenance/detector-version-log.md` | **The audit trail** — a chronological index plus the canonical numbered bug table; every claim in this repository traces back to a checkpoint and evidence tier recorded here. The full development-process narrative it was distilled from is preserved in this repo's git history. |
 
 ## Quick start
 

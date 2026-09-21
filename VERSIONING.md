@@ -30,9 +30,11 @@ by this rename**: every real date this repo has ever established still lives exa
 before — each checkpoint's own `README.md` (or, for the four taxonomy-only snapshots, each
 `taxonomy.yaml`'s header comment) states its real date in prose, independent of the folder name;
 `detectors/CHANGELOG.md` and `taxonomy/CHANGELOG.md` carry it in an explicit "Real date" column; and
-`../provenance/detector-version-log.md` is the full, original audit trail every one of those dates was
-established from (zip-preserved per-file modification timestamps, a conversation-export's own date marker, or
-bounding by direct diff against neighboring checkpoints — never assumed). When this repo is pushed to
+`../provenance/detector-version-log.md` is the audit trail every one of those dates was established from
+(zip-preserved per-file modification timestamps, a conversation-export's own date marker, or bounding by
+direct diff against neighboring checkpoints — never assumed); it was condensed on 2026-09-21 to a
+chronological index, with the full original development-process narrative preserved in this repo's git
+history (see that file's own header note). When this repo is pushed to
 GitHub, **git tags/commits, honestly dated at actual push time and never backdated**, become the citable
 version mechanism going forward — the folder slugs are what code and docs reference internally; the git
 history is what makes "which exact state of this repo produced Table 4" answerable the normal, git-native
@@ -43,9 +45,10 @@ renamed checkpoint, diffed byte-for-byte against its pre-rename content: only th
 in `notes` columns changed, never any score or label).
 
 The full citation for every date, and for every claim about what changed at each checkpoint, lives in
-**`../provenance/detector-version-log.md`**, which is the actual audit trail this repo is built from. This
-file, `detectors/CHANGELOG.md`, and `taxonomy/CHANGELOG.md` are compressed indexes into that log, kept
-deliberately short so they don't drift out of sync with it — when in doubt, the log wins.
+**`../provenance/detector-version-log.md`**, the audit trail this repo is built from (now itself a
+condensed chronological index — see its header note for where the full narrative it was distilled from
+lives). This file, `detectors/CHANGELOG.md`, and `taxonomy/CHANGELOG.md` are compressed indexes into that
+log, kept deliberately short so they don't drift out of sync with it — when in doubt, the log wins.
 
 ## Detector checkpoints (chronological)
 
