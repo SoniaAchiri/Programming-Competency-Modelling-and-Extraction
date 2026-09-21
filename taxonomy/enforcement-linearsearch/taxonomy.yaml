@@ -1,0 +1,33 @@
+# Taxonomy snapshot — Q1 (sequential search) taxonomy correction, as of the "files_Enforcement" +
+# "q1_competencies.py" detector checkpoint (2026-07-28)
+#
+# Regenerated from ../../provenance/detector-version-log.md, section "## Enforcement + Q1's LinearSearch".
+
+status: current_for_Q1
+supersedes: taxonomy/v1.0.0-baseline (GuardedInput used as Q1's own target, Q1 only)
+detector_checkpoint: detectors/enforcement
+
+competencies:
+  - name: LinearSearch
+    question: 1
+    task: "Sequential search"
+    composition: primitive
+    definition: >
+      components={target: (INPUT, PARAM), test: TEST, loop: LOOP},
+      structural = AND(NESTED(loop, test), SHARED_BINDING([(target,target,test,operand)]))
+    design_rationale: >
+      Structurally identical to GuardedInput, but registered as an independent competency rather than a
+      wrapper around it — wrapping would encode a false "search is a kind of guarded input" relationship
+      into the taxonomy's own dependency graph, when the two are only accidentally the same AST shape
+      (retry-until-valid input vs. scan-and-compare). Quoted from the file's own comment.
+    real_coverage: >
+      Validated against the FULL Question 1 dataset (1,343 submissions, correct and wrong combined):
+      zero mismatches between LinearSearch and GuardedInput across all 1,342 usable files. Source: the
+      28/07 methodology note, §6.1. NO BATCH SCRIPT OR CSV for this run has been supplied — only this
+      one sentence, in one document, states the figure (unlike Q2/Q3/Q4, which have at least two
+      independent documents corroborating each figure).
+    old_versioning_note: >
+      An earlier, guessed version of this repo's VERSIONING.md placed LinearSearch's split from
+      GuardedInput near the project's start ("v1.1.0"). Real evidence dates it to 2026-07-28, well after
+      the Q2-Q5 full-corpus validation work — the guessed *reasoning* (avoids encoding a false
+      relationship) was correct; the guessed *timing* was wrong.

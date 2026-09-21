@@ -1,0 +1,32 @@
+{
+  "experiment": "q4_sortbykey",
+  "description": "Q4 (SortByKey exercise): bubblesort (BubbleSortPass) vs. topk (TopKPattern) taxonomic split, cross-validated against codet5p-110m-embedding.",
+  "n_labeled_total": 489,
+  "label_counts": {
+    "bubblesort": 69,
+    "topk": 420
+  },
+  "n_excluded_neither_matched": 287,
+  "split_fraction_train": 0.7,
+  "n_splits": 10,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "generation_method": "q4_labeled = q4_report[q4_report['strategy_label'].notna()][['file','strategy_label']]; for seed in range(10): shuffled = q4_labeled.sample(frac=1, random_state=seed).reset_index(drop=True); split_point = int(len(shuffled) * 0.7); train = shuffled.iloc[:split_point]; test = shuffled.iloc[split_point:]",
+  "structural_label_rule": "bubblesort if BubbleSortPass_final >= 0.999; elif topk if TopKPattern_final >= 0.999; else excluded (the 22.4% 'neither' group)",
+  "source_report_csv": "q4_report.csv (from batch_report.py's Q4 run, pulled from Drive, 776 rows)",
+  "source_notebook": "q2_q4_embeddings_crossvalidation_with_Results.ipynb (Drive fileId 1cUe_-meUcPg3P_n0a_Rsc5jos10WKwOZ)",
+  "reported_metric": "bubblesort/topk accuracy: mean=0.936, std=0.021 (pooled over the 10 seeds' test predictions) -- std confirmed verbatim present in the notebook's raw content via Drive full-text search",
+  "verification": {
+    "all_10_seeds": "INDEPENDENTLY CONFIRMED, EXACT MATCH: the notebook itself saved its full multi-seed pooled predictions to Drive as q4_embeddings_crossvalidation.csv (fileId 1YjflrBr-t5VLXsiK0POt0Haatx7ddlYf, 1470 rows = 10 seeds x 147 test rows/seed). For every one of the 10 seeds, the replayed test-set file list here is a byte-for-byte exact match to that recorded file's test-set file list for the same seed. Train-set lists (not separately recorded by the notebook, since only test predictions were saved) are the deterministic complement of each seed's confirmed test set within the same confirmed 489-file labeled set, which is what the split code itself computes."
+  }
+}

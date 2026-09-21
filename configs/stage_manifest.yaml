@@ -1,0 +1,1085 @@
+# Stage manifest — THE audit index of this repository.
+#
+# Every number cited below is real and cross-referenced against ../provenance/detector-version-log.md — no
+# entry here is invented or estimated. `evidence` on each stage says plainly whether a real batch CSV
+# backs the number or whether it's conversation/paper-reported only. As of the 2026-08-05 round, every *_final
+# stage for Q1-Q5 (q1_final, q2_final, q3_final, q4_final, q5_final) is `evidence: real_csv` — the
+# intermediate/superseded stages (q1_prefix, q3_prefix, q4_bubblesort_only, q4_topkpattern_transferred,
+# q5_whole_file, q5_unscoped_post_refactor) remain conversation_reported_only, multiply corroborated across
+# independent documents but not backed by a supplied CSV of their own. `data_file` is only populated where
+# that file genuinely exists in this repo; everywhere else it says PENDING rather than pointing at a path
+# that doesn't exist.
+#
+# An earlier version of this manifest invented a Q1 "76.8%->99.5%" trail, a Q5 "->79.7%->91.9%" trail, a
+# nonexistent TopKPatternExtended/DELEGATES+SELF_RECURSIVE fix, and an entire fabricated Table 5 section.
+# None of that survived contact with Sonia's real checkpoints and conversation exports. See ../VERSIONING.md's
+# "Corrected from an earlier, guessed version" note.
+#
+# coverage_threshold: the final_score cutoff counted as "covered." Q5's real topk_report.csv uses
+# final_score == 1.0 exactly (full marks on both coverage and structural axes) — confirmed by direct
+# inspection of the CSV, not assumed.
+coverage_threshold: 1.0
+
+stages:
+  # ---- Question 1: Sequential search --------------------------------------------------------------
+  - id: q1_prefix
+    question: 1
+    label: "GuardedInput/LinearSearch, before the SHARED_BINDING/all_names fix"
+    taxonomy_checkpoint: taxonomy/enforcement-linearsearch
+    detector_checkpoint: detectors/fixq4
+    scoping_mode: function-scoped
+    reported_value_pct: "76.8%"
+    reported_wrong_label_pct: "64.2%"
+    reported_n_correct: 768
+    reported_n_wrong: 575
+    reported_zero_score_breakdown:
+      genuine_coverage_gap: 19
+      structural_detector_limitation: 364
+      mechanisms:
+        flipped_comparison_direction: "199 (55%)"
+        compound_and_or_or_chained: "157 (43%)"
+        while_condition_as_test: "8 (2%)"
+    evidence: conversation_reported_only
+    corroborating_sources: 3
+    source: "run_q1_Q4_batch_validation.docx (conversation, 2026-08-05); Competency_Extraction_Methodology.docx (2026-08-05) §5.2; Structural_Competency_Extraction_Paper_modif_2.pdf §5.3"
+    data_file: "PENDING — no pre-fix CSV was supplied; only the post-fix q1_final (below) has a real CSV. This stage's numbers are conversation/paper-reported only, though multiply corroborated and consistent with q1_final's own post-fix CSV in the specific sense that q1_final's zero-scoring rows are an exact subcategory match (14 missing-loop + 3 missing-both-loop selection, see provenance/detector-version-log.md's '17 vs 19' reconciliation)."
+    required_for_publication: false
+
+  - id: q1_final
+    question: 1
+    label: "GuardedInput/LinearSearch, after the SHARED_BINDING/all_names fix, full corpus"
+    taxonomy_checkpoint: taxonomy/enforcement-linearsearch
+    detector_checkpoint: detectors/q1-shared-binding-fix
+    scoping_mode: function-scoped
+    reported_value_pct: "99.5%"
+    reported_wrong_label_pct: "97.6%"
+    reported_n_correct: 768
+    reported_n_wrong: 575
+    reported_n_total: 1343
+    reported_n_usable: 1342
+    reported_result: "GuardedInput and LinearSearch score identically on every row of this CSV (0 differences, confirmed by direct diff of every column) — the '1,342 of 1,343 / 99.93%' figure quoted in the methodology doc and paper traces to a pandas NaN != NaN comparison artifact in an earlier before/after diff, not a real difference; see provenance/detector-version-log.md."
+    evidence: real_csv
+    corroborating_sources: 3
+    source: "run_q1_Q4_batch_validation.docx (conversation, 2026-08-05); Competency_Extraction_Methodology.docx (2026-08-05) §5.2, bug #22; Structural_Competency_Extraction_Paper_modif_2.pdf §5.3 and Table 4"
+    data_file: data/labels_scores/q1_final.csv
+    source_data_file: detectors/q1-q4-batch-validation/q1_report.csv
+    driver_script: detectors/q1-q4-batch-validation/run_q1_q4_batch_validation.py
+    fix_checkpoint: detectors/q1-shared-binding-fix
+    verification: "Recomputed directly from this CSV in-session: 764/768 correct (99.5%), 561/575 wrong (97.6%) — exact match to every reported figure and to the paper's own Table 4 row. GuardedInput_final/_missing and LinearSearch_final/_missing are byte-identical across all 1,343 rows (0 differences), confirmed by direct column diff."
+    note: >
+      This stage's evidence upgraded from conversation_reported_only to real_csv this round — the first time any
+      Q1-Q4 stage has a real, independently-recomputable CSV behind it. Prior to the fix (see q1_prefix
+      above), the same competency scored only 76.8%/64.2% due to a structural-matching limitation in
+      SHARED_BINDING (canonical bug #22) — see detectors/q1-shared-binding-fix/ for the fix
+      itself and provenance/detector-version-log.md for the full diagnostic writeup (383 zero-scores split into
+      19 genuine gaps + 364 structural-detector misses across three quantified mechanisms).
+    required_for_publication: true
+
+  # ---- Question 2: Unique day/month ---------------------------------------------------------------
+  - id: q2_final
+    question: 2
+    label: "UniqueCheck = ANY(counter, tuple-accumulate, functional), full corpus, function-scoped"
+    taxonomy_checkpoint: taxonomy/q2-3rd-strategy-uniquecheck
+    detector_checkpoint: detectors/q2-3rd-strategy
+    scoping_mode: function-scoped
+    reported_value_pct:
+      explicit_counter: "85.2%"
+      tuple_accumulate_then_count: "0.7%"
+      functional_pipeline: "4.5%"
+      combined: "90.4%"
+    reported_n_correct: 291
+    reported_n_wrong: 435
+    evidence: real_csv
+    corroborating_sources: 4
+    source: "The_output_Results_26.docx; Competency_Extraction_Methodology.docx (28/07) §6.2; Structural_Competency_Extraction_Paper_modif_2.pdf Table 4; run_q1_Q4_batch_validation.docx (conversation, 2026-08-05)"
+    data_file: data/labels_scores/q2_final.csv
+    source_data_file: detectors/q1-q4-batch-validation/q2_report.csv
+    driver_script: detectors/q1-q4-batch-validation/run_q1_q4_batch_validation.py
+    verification: "Recomputed directly from this CSV in-session: 263/291 correct (90.4%), 323/435 wrong (74.3%) — exact match to the reported combined figure and to the paper's own Table 4 row. Note: UniqueCheck is a directly-registered, standalone competency in this CSV, not itself computed here as an ANY of the sibling ConditionalCount/AccumulateThenCount columns also present in the raw file — the 85.2%/0.7%/4.5% strategy-share breakdown is not independently re-derivable from this CSV alone without a per-row strategy label."
+    note: >
+      This stage's evidence upgraded from conversation_reported_only to real_csv this round — the driver script
+      logged at detectors/q1-q4-batch-validation/ has now actually been run by Sonia and its
+      output (q2_report.csv) supplied and independently re-verified above. The script's own accompanying
+      conversation previously contained one CONFIRMED-FALSE claim (that pw01_competencies.py, not just
+      q2_competencies.py, defines a function named unique_day) — see the log for the full correction; does
+      not affect the function name itself, which q2_competencies.py's own code does confirm, and does not
+      affect this stage's real, CSV-backed figures.
+    required_for_publication: true
+    open_note: >
+      A stale, pre-correction "33%" figure is described inconsistently across two of the three
+      corroborating sources (counter-strategy share vs. alternative-strategy share) — see the log. Does
+      not affect the 85.2/0.7/4.5/90.4 figures above.
+
+  # ---- Question 3: Duplicate elimination ----------------------------------------------------------
+  - id: q3_prefix
+    question: 3
+    label: "SelectionStep, before .insert() fix"
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/enforcement
+    scoping_mode: function-scoped
+    reported_value_pct: "93.6%"
+    evidence: conversation_reported_only
+    corroborating_sources: 2
+    source: "Q3_Q4_Results_28.docx; Structural_Competency_Extraction_Paper.docx §5.5"
+    data_file: "PENDING — Sonia to supply from Colab/Drive"
+    required_for_publication: false
+
+  - id: q3_final
+    question: 3
+    label: "SelectionStep, after .insert() fix, full corpus"
+    taxonomy_checkpoint: taxonomy/fixq4-sortbykey
+    detector_checkpoint: detectors/fixq4
+    scoping_mode: function-scoped
+    reported_value_pct: "94.0%"
+    reported_n_correct: 546
+    reported_n_wrong: 308
+    evidence: real_csv
+    corroborating_sources: 3
+    source: "Q3_Q4_Results_28.docx; Structural_Competency_Extraction_Paper_modif_2.pdf §5.3, Table 4; run_q1_Q4_batch_validation.docx (conversation, 2026-08-05)"
+    data_file: data/labels_scores/q3_final.csv
+    source_data_file: detectors/q1-q4-batch-validation/q3_report.csv
+    driver_script: detectors/q1-q4-batch-validation/run_q1_q4_batch_validation.py
+    verification: "Recomputed directly from this CSV in-session: 513/546 correct (94.0%), 230/308 wrong (74.7%) — exact match to the reported figure and to the paper's own Table 4 row."
+    note: >
+      This stage's evidence upgraded from conversation_reported_only to real_csv this round — the driver script
+      logged at detectors/q1-q4-batch-validation/ has now actually been run by Sonia and its
+      output (q3_report.csv) supplied and independently re-verified above. Q3's function_name
+      ("remove_extras") remains Sonia-asserted, not independently checkable against any real submission
+      source file supplied to this project — but the resulting scores are now real, CSV-backed data.
+    required_for_publication: true
+
+  # ---- Question 4: Sort tuples by age -------------------------------------------------------------
+  - id: q4_bubblesort_only
+    question: 4
+    label: "BubbleSortPass alone (the original, unvalidated taxonomy assumption)"
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/fixq4
+    scoping_mode: function-scoped
+    reported_value_pct: "13.1%"
+    evidence: conversation_reported_only
+    corroborating_sources: 2
+    source: "Q3_Q4_Results_28.docx; Structural_Competency_Extraction_Paper.docx §5.5"
+    data_file: "PENDING — Sonia to supply from Colab/Drive"
+    required_for_publication: false
+
+  - id: q4_topkpattern_transferred
+    question: 4
+    label: "TopKPattern applied to Q4 with zero new code"
+    taxonomy_checkpoint: taxonomy/fixq4-sortbykey
+    detector_checkpoint: detectors/fixq4
+    scoping_mode: function-scoped
+    reported_value_pct: "64.4%"
+    matched_branch_filter: TopKPattern
+    evidence: conversation_reported_only
+    corroborating_sources: 2
+    source: "Q3_Q4_Results_28.docx; Structural_Competency_Extraction_Paper.docx §5.5"
+    data_file: "PENDING — Sonia to supply from Colab/Drive"
+    required_for_publication: false
+
+  - id: q4_final
+    question: 4
+    label: "SortByKey = ANY(BubbleSortPass, TopKPattern), full corpus"
+    taxonomy_checkpoint: taxonomy/fixq4-sortbykey
+    detector_checkpoint: detectors/fixq4
+    scoping_mode: function-scoped
+    reported_value_pct: "77.6%"
+    reported_n_correct: 419
+    reported_n_wrong: 357
+    evidence: real_csv
+    corroborating_sources: 3
+    source: "Q3_Q4_Results_28.docx; Structural_Competency_Extraction_Paper_modif_2.pdf §5.4, Table 4; also confirmed in code comment at detectors/fixq4/test_real_data.py; run_q1_Q4_batch_validation.docx (conversation, 2026-08-05)"
+    data_file: data/labels_scores/q4_final.csv
+    source_data_file: detectors/q1-q4-batch-validation/q4_report.csv
+    driver_script: detectors/q1-q4-batch-validation/run_q1_q4_batch_validation.py
+    verification: "Recomputed directly from this CSV in-session: 325/419 correct (77.6%), 164/357 wrong (45.9%) — exact match to the reported figure and to the paper's own Table 4 row. matched_branch in data/labels_scores/q4_final.csv confirms this is a real ANY(BubbleSortPass, TopKPattern) result, not just SortByKey scored standalone."
+    note: >
+      This stage's evidence upgraded from conversation_reported_only to real_csv this round — the driver script
+      logged at detectors/q1-q4-batch-validation/ has now actually been run by Sonia and its
+      output (q4_report.csv) supplied and independently re-verified above, confirming the operational risk
+      flagged in the prior round (whether SortByKey was registered in Sonia's live test_real_data.py) did
+      not materialize — the CSV's SortByKey_final/_missing columns are populated for every row. Q4's
+      function_name ("sort_age") remains Sonia-asserted, not independently checkable against any real
+      submission source file supplied to this project.
+    required_for_publication: true
+
+  # ---- Question 5: Top-K ----------------------------------------------------------------------------
+  - id: q5_whole_file
+    question: 5
+    label: "whole-file, pre-scoping-fix"
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/reporting-batch
+    scoping_mode: whole-file
+    reported_value_pct: "83.0%"
+    reported_wrong_label_pct: "76.9%"
+    evidence: conversation_reported_only
+    corroborating_sources: 2
+    source: "Levels_of_competencies_21_07.docx; Structural_Competency_Extraction_Paper.docx §5.3"
+    data_file: "PENDING — no unscoped CSV has ever been supplied; only the scoped run's CSV exists (see q5_final)"
+    required_for_publication: false
+
+  - id: q5_final
+    question: 5
+    label: "function-scoped, TopKPattern with explicit removal check"
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/reporting-batch
+    scoping_mode: function-scoped
+    reported_value_pct: "78.2%"
+    reported_wrong_label_pct: "75.0%"
+    reported_n_correct: 418
+    reported_n_wrong: 108
+    evidence: real_csv
+    data_file: data/labels_scores/q5_final.csv
+    source_data_file: detectors/reporting-batch/topk_report.csv
+    regenerate_script: scripts/build_labels_scores_from_batch_reports.py --question 5
+    verification: "Recomputed directly from this CSV in-session: 327/418 correct (78.2%), 81/108 wrong (75.0%) — exact match to every reported figure."
+    note: >
+      data/labels_scores/q5_final.csv is data/labels_scores/README.md's schema, derived mechanically from
+      the real source_data_file above (see data/labels_scores/README.md for the exact transform). The raw
+      source only recorded TopKPattern_final per submission, not a separate coverage/structural
+      breakdown, so this repo's coverage_score/structure_score columns are conservatively backfilled from
+      final_score rather than independently measured — flagged in that file's own notes column too.
+      UPDATE (2026-09-19): until this date, this file had been hand-built and had no actual regeneration
+      script wired up (build_labels_scores_from_batch_reports.py's Q5 entry only ever built
+      q5_final_extended.csv below) -- discovered during the checkpoint-renaming pilot
+      (detectors/2026-07-21_reporting_batch -> detectors/reporting-batch, see VERSIONING.md) while fixing
+      this file's stale notes-column path citation. The script's Q5 entry is now a list of two configs
+      (original TopKPattern-only + extended), so `--question 5`/`--all` regenerate both q5_final.csv and
+      q5_final_extended.csv. Regenerating against the renamed checkpoint reproduced all 526 rows'
+      submission_id/test_suite_label/target_competency/coverage_score/structure_score/final_score/
+      matched_branch fields byte-for-byte identical to the pre-rename file (diffed directly) -- only the
+      notes column's path string changed, from the old detectors/2026-07-21_reporting_batch/... to the
+      current detectors/reporting-batch/... . regenerate_script above is newly added; this stage was
+      previously missing that field even though its note already (correctly, if not yet truly) called the
+      derivation "mechanical."
+    required_for_publication: true
+
+  - id: q5_final_extended
+    question: 5
+    label: "function-scoped, TopKPatternExtended = ANY(TopKPattern, TopKViaDelegate, SortThenSlice)"
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/q5-delegation-clustering-fix
+    scoping_mode: function-scoped
+    reported_value_pct: "91.9%"
+    reported_wrong_label_pct: "80.6%"
+    reported_n_correct: 418
+    reported_n_wrong: 108
+    evidence: real_csv
+    data_file: data/labels_scores/q5_final_extended.csv
+    source_data_file: detectors/q5-delegation-clustering-fix/topk_report_EXTENDED2.csv
+    regenerate_script: scripts/build_labels_scores_from_batch_reports.py --question 5
+    verification: "Recomputed directly from this CSV in-session: 384/418 correct (91.9%), 87/108 wrong (80.6%) -- exact match to every reported figure and to Structural_Competency_Extraction_Paper.docx's (2026-08-08, after-clustering revision) own Table 4."
+    note: >
+      Supersedes q5_final above as Table 4's reported Q5 headline (see table4_config.yaml), but does not
+      replace it -- q5_final's 78.2%/75.0% TopKPattern-only figure remains preserved as a real, earlier
+      checkpoint. This stage exists because an embedding-clustering discovery pass over Q5's 43
+      correct-labeled + 5 wrong-labeled FindExtremum-scored-0 "novel" submissions (see
+      detectors/semantic-backup-layer-validation/'s clustering-extended notebooks and
+      provenance/detector-version-log.md's "Q5 delegation fix via embedding-guided clustering" section) found
+      that ~38 of the 43 correct novel files share a delegation shape (top_k itself calls a
+      differently-named helper and slices the result) invisible to function-scoped inline resolution.
+      TWO new competencies close this gap: TopKViaDelegate (DELEGATES to TopKPattern -- catches helpers
+      that repeat the exact find-max/remove/append shape) and SortThenSlice (DELEGATES to a new
+      HasSubstantialWork check, which now covers LOOP *or* the newly-added SELF_RECURSIVE primitive --
+      closing a real gap where a pure-recursion merge_sort helper had zero LOOP nodes and so was
+      previously invisible to any "does real work" check). Real, verified, zero regressions (no row with
+      TopKPattern_final==1 has TopKPatternExtended_final==0). A confirmed but uncharacterized caveat:
+      TopKPattern's own combinatorial matcher has at least one latent false-positive mode (a bubble-sort-
+      style insert/pop shuffle coincidentally satisfying its loop/test/removal shape -- confirmed on
+      correct_5_416.py), newly exposed by delegation testing TopKPattern against a wider variety of
+      helper-function bodies than inline-only resolution ever did; manually sample-checked 7 of 17
+      TopKViaDelegate catches (6 genuine, 1 false positive == ~14% sample false-positive rate), so
+      91.9%/80.6% is very likely a slight overstatement by an uncharacterized amount -- explicitly not
+      claimed as a fully row-by-row-verified number the way the Q1 fix's 99.5%/97.6% was. Also newly real
+      this round: a genuine 78.2% -> 79.7% baseline drift for TopKPattern's OWN (non-extended) correct-side
+      coverage, confirmed by direct diff against the original topk_report.csv (exactly 6 correct files flip
+      0->1, 0 wrong-side changes) and traced to the Q1 SHARED_BINDING/all_names fix (q1_shared_binding_fix)
+      incidentally shifting a handful of TopKPattern's own combinatorial matches -- both figures
+      independently re-verified, not assumed; q5_final above still correctly reports the original 78.2%
+      as ITS OWN checkpoint's real figure at the time it was measured, not amended in place. Striking,
+      purely coincidental resemblance to this repo's own corrected (fabricated) VERSIONING.md note, which
+      guessed a nonexistent "TopKPatternExtended" competency with DELEGATES + a nonexistent SELF_RECURSIVE
+      primitive and a Q5 figure of "79.7% -> 91.9%" months before any of this was real -- see
+      VERSIONING.md's own corrections section and provenance/detector-version-log.md for the full, carefully
+      hedged writeup of that coincidence.
+    required_for_publication: true
+
+  - id: q5_taxonomy_embedding_crossvalidation
+    question: 5
+    label: >
+      External validation of the SelectionStep/FindExtremum ("manual"/"builtin") taxonomic split via
+      Salesforce/codet5p-110m-embedding, on a single (unshuffled) 70/30 split, blind to the structural
+      label at classification time
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/reporting-batch
+    scoping_mode: function-scoped
+    embedding_model: Salesforce/codet5p-110m-embedding
+    reported_value_pct:
+      manual_builtin_agreement: "89.1%"
+      overall_3way_accuracy: "86.1%"
+      novel_recall: "45.5%"
+    reported_n_test: 158
+    reported_n_manual_builtin_test: 147
+    reported_n_novel_test: 11
+    reported_precision_recall:
+      manual: "precision 0.98 / recall 0.86"
+      builtin: "precision 0.77 / recall 0.96"
+    evidence: real_csv
+    data_file: data/labels_scores/q5_taxonomy_crossvalidation_results.csv
+    regenerate_script: scripts/regenerate_taxonomy_crossvalidation.py
+    verification: >
+      Recomputed directly from this CSV in-session: confusion matrix manual[83,14,0] builtin[2,48,0]
+      novel[5,1,5]; overall accuracy 0.8607594936708861; manual/builtin-only accuracy 0.8911564625850340
+      (89.1%, the figure reported into the paper's own §5.5); novel recall 0.45454545454545453 — exact
+      match to every figure quoted in the source conversation (Steps for semantic_backup.docx) AND to the published
+      paper's own §5.5 text (papers/2026-09-10_Structural_Competency_Extraction_Paper.pdf, read in full).
+      The paper's own stated precision/recall (manual 0.98/0.86, builtin 0.77/0.96) is also arithmetically
+      consistent with this confusion matrix (verified this session: precision=83/85=0.976, recall=83/97=0.855,
+      precision=48/62=0.774, recall=48/50=0.96). RESOLVED (was flagged as an open discrepancy in a prior
+      round): an earlier conversation-quoted classification_report figure (manual precision 0.92) is ALSO correct —
+      it is the full 3-way precision (denominator 83+2+5=90, including 5 novel-actual submissions
+      misclassified as manual), vs. the paper's 0.98 restricted to just the manual/builtin subset
+      (denominator 83+2=85, novel rows excluded). Both computations are legitimate; see
+      multi_seed_loop_chat_export.txt and provenance/detector-version-log.md for the full arithmetic.
+    source: "Steps for semantic_backup.docx (31/07/2026, 15:50-16:30+); detectors/ast-taxonomy-crossvalidation/ast_taxonomy_crossvalidation.ipynb; papers/2026-09-10_Structural_Competency_Extraction_Paper.pdf §5.5; detectors/ast-taxonomy-crossvalidation/multi_seed_loop_chat_export.txt (04/08/2026)"
+    note: >
+      This is a DIFFERENT experiment from table5.q5_topk_splits below (the still-unsupplied companion-
+      paper novel-detection validation) — this one checks the AST taxonomy's own manual/builtin split
+      using embeddings as an external validation tool, not the semantic-backup layer's own novel-detection
+      capability. UPDATE (2026-09-20): the "still-unsupplied companion-paper" framing for
+      table5.q5_topk_splits specifically was wrong — it is now confirmed to be the SAME taxonomic-split
+      experiment as q5_taxonomy_embedding_crossvalidation_10seed_pooled (the 10-seed sweep below this
+      single-run stage), not the novel-detection work. See table5.q5_topk_splits' own note for the
+      evidence trail. This paragraph's distinction between the taxonomic-split check and the
+      semantic-backup layer's novel-detection capability remains correct and unaffected — those two really
+      are different things; only the claim that q5_topk_splits belonged to the latter was mistaken.
+      The published AST paper's §5.5 ("External validation of a taxonomic split via code
+      embeddings") ORIGINALLY reported only the manual/builtin 89.1% figure, confusion matrix, and
+      asymmetric-error observation from this single unshuffled split, with a real citation (Wang et al.,
+      2023, CodeT5+/EMNLP 2023) — confirmed by direct reading of the paper PDF, not conversation description. The
+      novel/recall-0.45 finding was deliberately kept out of the AST paper and reserved for the companion
+      paper, per both the source conversation and the paper's own §7 Limitations, which (confirmed in the PDF)
+      contains one forward-pointing sentence about a preliminary companion-paper novel-detection check.
+      See papers/README.md and the "The updated paper" section of provenance/detector-version-log.md for the
+      full word-for-word diff against the prior paper draft, including the resolved section-numbering
+      question (defects/Table 4 stayed at §5.6 because the old standalone §5.5, Q3/Q4 batch results, was
+      merged into §5.3, freeing the number for this new §5.5 — not a simple insertion).
+      SUPERSEDED IN THE PUBLISHED PAPER (as of papers/2026-08-04_Structural_Competency_Extraction_Paper.pdf,
+      confirmed by direct diff): §5.5 and the Abstract no longer report this single run's 89.1%/0.98/0.77
+      figures at all — they now report the 10-seed sweep's pooled mean±SD instead (87.0% ± 2.3% manual/
+      builtin agreement; manual precision 0.94/recall 0.87; builtin precision 0.75/recall 0.88 — see
+      q5_taxonomy_embedding_crossvalidation_10seed_pooled below). This single-run entry is kept in this
+      manifest, with evidence: real_csv unchanged, because it remains a real, independently-reproducible,
+      historically-important stage (the first embedding-validation figure ever published, and the number
+      that motivated checking for split-to-split stability in the first place) — it is simply no longer
+      the figure a reader will find in the current paper.
+    required_for_publication: false  # was true; the current paper no longer cites this single-run figure directly
+
+  - id: q5_taxonomy_embedding_crossvalidation_shuffled_check
+    question: 5
+    label: >
+      Real-data check of split-to-split stability: the same manual/builtin/novel nearest-centroid
+      classification as q5_taxonomy_embedding_crossvalidation, but with ast_taxonomy_crossvalidation.ipynb's
+      SHUFFLE_BEFORE_SPLIT flag flipped to True and re-run once ("seed=0" per the source conversation's own table) —
+      this is seed 0 of the later 10-seed sweep (see q5_taxonomy_embedding_crossvalidation_10seed_pooled
+      below), logged here as its own standalone real result since it was supplied and verified before the
+      full sweep's own notebook output arrived
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/reporting-batch
+    scoping_mode: function-scoped
+    embedding_model: Salesforce/codet5p-110m-embedding
+    reported_value_pct:
+      manual_builtin_agreement: "85.2%"
+      overall_3way_accuracy: "83.5%"
+      novel_recall: "69%"
+    reported_n_test: 158
+    reported_n_manual_builtin_test: 142
+    reported_n_novel_test: 16
+    reported_precision_recall:
+      manual: "precision 0.88 / recall 0.85"
+      builtin: "precision 0.72 / recall 0.86"
+      novel: "precision 1.00 / recall 0.69"
+    evidence: real_csv
+    data_file: data/labels_scores/q5_taxonomy_crossvalidation_shuffled_seed0_results.csv
+    source_data_file: detectors/ast-taxonomy-crossvalidation/ast_taxonomy_crossvalidation_results_shuffled_seed0.csv
+    regenerate_script: scripts/regenerate_taxonomy_crossvalidation.py
+    verification: >
+      UPGRADED THIS ROUND from evidence: conversation_reported_only to evidence: real_csv — the raw 158-row
+      per-file CSV for this exact run was supplied this round
+      (ast_taxonomy_crossvalidation_results_1.csv, renamed above for clarity) and independently
+      recomputed in-session: confusion matrix manual[83,15,0] builtin[6,38,0] novel[5,0,11]; overall
+      accuracy 0.8354430379746836; manual/builtin-only accuracy 0.852112676056338 (121/142); novel recall
+      0.6875 (11/16) — exact match, to full floating-point precision, against every figure previously
+      logged from the conversation quote alone. See scripts/regenerate_taxonomy_crossvalidation.py's second run
+      block.
+    source: "multi-seed loop.docx (04/08/2026); ast_taxonomy_crossvalidation_results_1.csv (supplied 2026-09-12)"
+    note: >
+      Directly comparable to q5_taxonomy_embedding_crossvalidation (also evidence: real_csv) since both
+      come from the same notebook and methodology, differing only in the SHUFFLE_BEFORE_SPLIT flag and the
+      resulting train/test partition. This is the real result that motivated the 10-seed sweep, and is
+      numerically identical to seed 0 of that sweep's own per-seed table (acc_3way 0.835443, acc_mb
+      0.868966 there vs. 0.852113 here — see the dedicated note below on why these two "seed 0" figures
+      differ slightly despite being the same nominal split).
+    required_for_publication: false
+
+  - id: q5_taxonomy_embedding_crossvalidation_10seed_pooled
+    question: 5
+    label: >
+      The full 10-seed (SEEDS = list(range(10))) multi-split robustness sweep for the AST-taxonomy
+      manual/builtin/novel embedding cross-validation — the figure the published paper's current §5.5 and
+      Abstract actually report (superseding the single-run 89.1% figure above)
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/reporting-batch
+    scoping_mode: function-scoped
+    embedding_model: Salesforce/codet5p-110m-embedding
+    reported_value_pct:
+      manual_builtin_agreement_mean: "87.0%"
+      manual_builtin_agreement_sd: "2.3%"
+      manual_builtin_agreement_range: "82.6%-89.8%"
+      overall_3way_accuracy_mean: "83.7%"
+      overall_3way_accuracy_sd: "2.3%"
+      novel_recall_mean: "49.5%"
+      novel_recall_sd: "7.5%"
+      novel_recall_range: "40.0%-61.5%"
+    reported_n_seeds: 10
+    reported_n_pooled_predictions: 1580
+    reported_n_pooled_manual_builtin_predictions: 1441
+    reported_precision_recall_pooled_3way:
+      manual: "precision 0.88 / recall 0.87 (support 993)"
+      builtin: "precision 0.74 / recall 0.88 (support 448)"
+      novel: "precision 1.00 / recall 0.50 (support 139)"
+      accuracy: "0.84 (n=1580)"
+    reported_precision_recall_pooled_manual_builtin_only:
+      manual: "precision 0.94 / recall 0.87 (support 993)"
+      builtin: "precision 0.75 / recall 0.88 (support 448)"
+      accuracy: "0.87 (n=1441)"
+    evidence: real_notebook_output
+    regenerate_script: scripts/regenerate_10seed_taxonomy_sweep.py
+    corroborating_sources: 4
+    source: >
+      detectors/ast-taxonomy-crossvalidation/ast_taxonomy_crossvalidation_with_results.ipynb
+      (primary — real printed execution output, 12 cells); Copie_de_ast_taxonomy_crossvalidation.ipynb
+      (code-identical, outputs-stripped copy, confirms the code is unchanged between the two files);
+      semantic_backup_layer_findings_chat_export.txt (the conversation narration of this exact run, matching to
+      full printed precision); three chart images (chart_per_seed_accuracy.png,
+      chart_pooled_confusion_matrix.png, chart_pooled_precision_recall.png) — each independently confirms
+      the numbers transcribed here.
+    verification: >
+      evidence is real_notebook_output rather than real_csv because no per-submission raw CSV exists in
+      this repo for 9 of the 10 seeds (only seed 0's raw predictions were supplied separately — see
+      q5_taxonomy_embedding_crossvalidation_shuffled_check above). The per-seed table and pooled confusion
+      matrix here are transcribed verbatim from the notebook's own real printed output, not invented or
+      estimated. scripts/regenerate_10seed_taxonomy_sweep.py verifies, purely arithmetically, that (1) the
+      reported mean/SD are what numpy/pandas' sample-std computation actually gives over the 10 listed
+      per-seed values, and (2) every precision/recall/accuracy cell in both pooled classification reports
+      is exactly what the pooled confusion matrix's own row/column sums produce — i.e. the reports are not
+      just adjacent numbers, they are the matrix's arithmetic. All checks pass. Note: seed 0 in this sweep
+      (acc_3way 0.835443, acc_manual_builtin 0.868966, n_novel_test 13) is numerically close to but NOT
+      identical to the separately-supplied "shuffled seed=0" CSV logged above (acc_3way 0.835443 matches
+      exactly, but acc_manual_builtin 0.852113 and n_novel_test 16 do not) — both are real, both are
+      labeled "seed 0" by their respective sources, but they come from two different code paths (a
+      standalone re-run vs. the SEEDS-loop's own internal iteration) and are not guaranteed to use
+      identical shuffle state. Flagged here rather than silently treated as duplicates or reconciled by
+      assumption.
+    note: >
+      This is the number the published paper actually reports as of
+      papers/2026-08-04_Structural_Competency_Extraction_Paper.pdf: §5.5 and the Abstract now state "87.0%
+      ± 2.3%" and the pooled manual 0.94/builtin 0.75 precision figures rather than the single-run 89.1%/
+      0.98/0.77 figures. The source conversation's own reasoning for the switch (quoted in
+      provenance/detector-version-log.md's "The real 10-seed sweep" section): "The single run you originally
+      got (89.1%) sits right near the top of this range, not way outside it — so it wasn't a fluke, but it
+      was on the favorable end rather than representative. 87.0% ± 2.3% is the more honest number to
+      publish." The pooled predictions (1,580 total) are explicitly flagged by the source itself as NOT
+      fully independent — the same ~526 underlying files are reshuffled 10 different ways, so pooled
+      precision/recall is a legitimate, more-stable point estimate but should not be read as having 10x a
+      single run's statistical power. This resolves what was the leading item in "Still-pending items."
+    required_for_publication: true
+
+  - id: q4_taxonomy_embedding_crossvalidation_10seed_pooled
+    question: 4
+    label: >
+      External validation of the BubbleSortPass/TopKPattern taxonomic split (SortByKey's own ANY branches)
+      via Salesforce/codet5p-110m-embedding, same 10-seed multi-split methodology as
+      q5_taxonomy_embedding_crossvalidation_10seed_pooled -- a direct extension to Q4, not a different
+      experiment
+    taxonomy_checkpoint: taxonomy/fixq4-sortbykey
+    detector_checkpoint: detectors/q1-q4-batch-validation
+    scoping_mode: function-scoped
+    embedding_model: Salesforce/codet5p-110m-embedding
+    reported_value_pct:
+      accuracy_mean: "93.6%"
+      accuracy_sd: "2.1%"
+      accuracy_range: "89.8%-95.9%"
+    reported_n_seeds: 10
+    reported_n_labeled: 489
+    reported_n_bubblesort: 69
+    reported_n_topk: 420
+    reported_n_pooled_predictions: 1470
+    reported_precision_recall_pooled:
+      bubblesort: "precision 0.69 / recall 0.98 (support 204)"
+      topk: "precision 1.00 / recall 0.93 (support 1266)"
+      accuracy: "0.94 (n=1470)"
+    evidence: real_csv
+    regenerate_script: scripts/regenerate_q2q4_taxonomy_crossvalidation.py
+    data_file: data/labels_scores/q4_embeddings_crossvalidation.csv
+    source: "colab_embeddings_validation_chat_export.txt (05/08/2026, 17:40); detectors/q2-q4-embeddings-crossvalidation/q2_q4_embeddings_crossvalidation_with_Results.ipynb; data/labels_scores/q4_embeddings_crossvalidation.csv (real per-seed/per-file predictions, supplied in a later round); papers/2026-08-05_Structural_Competency_Extraction_Paper_final_22p_q4embedding_added.pdf §5.6 ('Q4: BubbleSortPass vs. TopKPattern')"
+    verification: >
+      Recomputed directly from the real per-seed/per-file CSV (1,470 rows: file, seed, true_label,
+      predicted) -- not transcribed from printed output: mean accuracy 93.6% (SD 2.1%, range 89.8%-95.9%)
+      across 10 seeds; pooled confusion matrix bubblesort[200,4]/topk[90,1176] (1,470 total) reproduces the
+      previously-transcribed classification report exactly, to full floating-point precision. A stronger,
+      tighter result than q5_taxonomy_embedding_crossvalidation_10seed_pooled's 87.0% ± 2.3% -- and the
+      confusion-matrix asymmetry runs the OPPOSITE direction from Q5's (bubblesort is the broad/
+      easy-to-fall-into cluster here; in Q5 manual was the broad cluster, not builtin). See
+      scripts/regenerate_q2q4_taxonomy_crossvalidation.py. The published paper's own §5.6 (as of the
+      2026-08-05 18:02 UTC revision, confirmed by direct pdftotext diff against the prior 14:05 UTC
+      revision) also states this same mean/SD/range and the same bubblesort/topk precision-recall pair
+      verbatim -- an exact match, not just a corroborating paraphrase; see papers/README.md.
+    note: >
+      Upgraded from evidence: real_notebook_output to real_csv once
+      data/labels_scores/q4_embeddings_crossvalidation.csv (one row per seed/file prediction, saved to
+      Sonia's Drive by the notebook's own last cell) was supplied in a later round than the notebook that
+      first reported this figure -- every number here is now recomputed from that raw file, not
+      transcribed from printed output, and matches to full precision (see verification above).
+      NOT the same experiment as table5.q4_sortbykey_splits below (the still-unsupplied companion-paper
+      train/test-split experiment) -- this validates the AST taxonomy's own Q4 split using embeddings as
+      an external check, mirroring q5_taxonomy_embedding_crossvalidation rather than table5.q5_topk_splits.
+      UPDATE (2026-09-20): this was wrong -- table5.q4_sortbykey_splits is now confirmed to be THIS SAME
+      experiment, not a distinct one (real split-index files supplied, independently reproduced, and
+      cross-checked byte-for-byte against this stage's own evidence CSV -- see table5.q4_sortbykey_splits'
+      note for the full trail). Left in place rather than deleted, per this repo's evidence-preservation
+      practice.
+      See detectors/q2-q4-embeddings-crossvalidation/README.md and
+      provenance/detector-version-log.md for the full writeup, including a real, diff-confirmed difference
+      between this notebook and its unexecuted "copy" sibling (a Drive folder-path fix,
+      refactory/data/question_4/code -> data/question_4/code, that was never narrated in the conversation).
+    required_for_publication: false  # not yet cited as a numbered table in the published paper, though §5.6 now quotes it in prose
+
+  - id: q2_taxonomy_embedding_crossvalidation_10seed_pooled
+    question: 2
+    label: >
+      External validation of UniqueCheck's counter/functional-pipeline taxonomic split via
+      Salesforce/codet5p-110m-embedding, same 10-seed methodology as the Q4/Q5 checks --
+      AccumulateThenCount (~0.7%) dropped as too rare for a stable centroid
+    taxonomy_checkpoint: taxonomy/q2-3rd-strategy-uniquecheck
+    detector_checkpoint: detectors/q1-q4-batch-validation
+    scoping_mode: function-scoped
+    embedding_model: Salesforce/codet5p-110m-embedding
+    reported_value_pct:
+      accuracy_mean: "95.9%"
+      accuracy_sd: "1.6%"
+    reported_n_seeds: 10
+    reported_n_labeled: 581
+    reported_n_counter: 564
+    reported_n_functional: 17
+    reported_n_pooled_predictions: 1750
+    reported_precision_recall_pooled:
+      counter: "precision 0.98 / recall 0.98 (support 1694)"
+      functional: "precision 0.33 / recall 0.27 (support 56)"
+      accuracy: "0.96 (n=1750)"
+    evidence: real_csv
+    regenerate_script: scripts/regenerate_q2q4_taxonomy_crossvalidation.py
+    data_file: data/labels_scores/q2_embeddings_crossvalidation.csv
+    source: "colab_embeddings_validation_chat_export.txt (05/08/2026, 17:40); detectors/q2-q4-embeddings-crossvalidation/q2_q4_embeddings_crossvalidation_with_Results.ipynb; data/labels_scores/q2_embeddings_crossvalidation.csv (real per-seed/per-file predictions, supplied in a later round)"
+    verification: >
+      Recomputed directly from the real per-seed/per-file CSV (1,750 rows: file, seed, true_label,
+      predicted) -- not transcribed from printed output: mean accuracy 95.9% (SD 1.6%) across 10 seeds;
+      pooled confusion matrix counter[1663,31]/functional[41,15] (1,750 total) reproduces the
+      previously-transcribed classification report exactly, to full floating-point precision.
+      INDEPENDENTLY CONFIRMED to be a class-imbalance artifact, not a validated finding: 'counter' is
+      96.8% of the pooled test set (1694/1750) -- a majority-class-only classifier would score HIGHER
+      (96.8%) than this classifier's own 95.9%. functional's own precision/recall (0.3261/0.2679, support
+      56) is close to uninformative. See scripts/regenerate_q2q4_taxonomy_crossvalidation.py's
+      majority-baseline check.
+    note: >
+      Per the source conversation's own explicit, honest recommendation: do NOT report this as a finding, positive
+      or negative -- "17 real examples is not enough to determine whether [the split can be recovered]," not
+      evidence the model succeeded or failed. If documented anywhere, belongs in Limitations, not Results,
+      the same treatment already given to Q1's while-condition gap (8 files) and Q5's novel group. Upgraded
+      from evidence: real_notebook_output to real_csv once
+      data/labels_scores/q2_embeddings_crossvalidation.csv was supplied in a later round than the notebook
+      that first reported this figure -- every number here now recomputes from that raw file and matches
+      to full precision, but the class-imbalance conclusion is unchanged by having the raw data: it was
+      already correctly derived from the pooled confusion matrix before this file arrived. NOT the same
+      experiment as any table5 entry below.
+    required_for_publication: false  # explicitly recommended against publication by the source conversation itself
+
+  - id: q5_unscoped_post_refactor
+    question: 5
+    label: "whole-file re-run, after TopKPattern's level-layering lifting-wrapper refactor"
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/fixq4
+    scoping_mode: whole-file
+    reported_value_pct: "82.1%"
+    evidence: conversation_reported_only
+    corroborating_sources: 1
+    source: "Competency_Extraction_Methodology.docx (28/07 methodology note), unnumbered §"
+    note: >
+      A small, further shift from 83.0% (not from 78.2%, which is the scoped figure and is unchanged by
+      this refactor). Traced, per the source, to a smaller-scale instance of the same resolver limitation
+      behind BubbleSortPass's own unfixed exception (canonical bug #19) — a wrapped primitive resolved
+      once and shared rather than searched independently. Structural_Competency_Extraction_Paper.docx does
+      not mention this refinement at all; not a contradiction, just a detail only the methodology note
+      carries forward.
+    data_file: "PENDING — Sonia to supply from Colab/Drive"
+    required_for_publication: false
+
+# ---- Table 5: embedding-based taxonomic discovery + semantic backup layer -------------------------
+#
+# Status per Sonia (2026-09-10): real artifacts for this section exist and will be supplied in a later
+# round. Nothing below is populated with a number — every field that would carry a real result is
+# explicitly PENDING rather than a placeholder that looks like data. Do not fill these in by inference
+# from the paper; wait for the real split indices / similarity CSVs.
+#
+# UPDATE (2026-09-20): both entries below are now populated with real, confirmed split-index files.
+# Corrects the "distinct, still-unsupplied companion-paper scope" framing this table carried until now
+# (also present in POPULATE.md step 4 and README.md's "What's here" table, both updated the same round) —
+# that framing turned out to be wrong, not merely unconfirmed. See each entry's note for the evidence.
+table5:
+  q4_sortbykey_splits:
+    split_dir: data/splits/q4_sortbykey
+    taxonomy_checkpoint: taxonomy/fixq4-sortbykey
+    detector_checkpoint: detectors/q1-q4-batch-validation
+    embedding_model: Salesforce/codet5p-110m-embedding
+    reported_mean: 93.6
+    reported_sd: 2.1
+    status: "REAL — same experiment as stages.q4_taxonomy_embedding_crossvalidation_10seed_pooled above"
+    note: >
+      UPDATE (2026-09-20): real split-index files supplied and verified — this is NOT a distinct
+      companion-paper experiment, despite this table's own prior note and POPULATE.md step 4 both
+      repeatedly saying so (that framing is now known to be wrong, not just unconfirmed, and is left in
+      place above/in POPULATE.md's history rather than deleted, per this repo's own evidence-preservation
+      practice). This table5 entry and stages.q4_taxonomy_embedding_crossvalidation_10seed_pooled above
+      are the same experiment: same source notebook
+      (detectors/q2-q4-embeddings-crossvalidation/q2_q4_embeddings_crossvalidation_with_Results.ipynb),
+      same source report (detectors/q1-q4-batch-validation/q4_report.csv, 776 rows), same seeded
+      pandas .sample(frac=1, random_state=seed) 70/30 split code run for seed in range(10), same
+      reported mean/SD (93.6% / 2.1%, to the reported precision). Independently reproduced in this
+      session by scripts/regenerate_splits.py --experiment q4_sortbykey --check, which recomputes the
+      labeled subset directly from q4_report.csv and regenerates all 10 seeds' train/test membership from
+      scratch: every one of the 10 regenerated test sets is an exact set-match to the recorded
+      split_NN_test_ids.txt file. Additionally, the supplied evidence file
+      (originally evidence/q4_RECORDED_pooled_predictions_all_10_seeds.csv in the delivered archive) is
+      byte-for-byte identical, sorted, to the CSV already backing
+      stages.q4_taxonomy_embedding_crossvalidation_10seed_pooled's evidence: real_csv
+      (data/labels_scores/q4_embeddings_crossvalidation.csv) — two independently-arrived-at copies of the
+      same underlying artifact. split_dir contains split_manifest.json (generation method, label rule,
+      seed-by-seed verification detail) plus split_NN_{train,test}_ids.txt for seeds 00-09.
+
+  q5_topk_splits:
+    split_dir: data/splits/q5_topk
+    taxonomy_checkpoint: taxonomy/v1.0.0-baseline
+    detector_checkpoint: detectors/reporting-batch
+    embedding_model: Salesforce/codet5p-110m-embedding
+    reported_mean: 87.0
+    reported_sd: 2.3
+    status: "REAL — same experiment as stages.q5_taxonomy_embedding_crossvalidation_10seed_pooled above"
+    note: >
+      UPDATE (2026-09-20): real split-index files supplied and verified — same correction as
+      q4_sortbykey_splits above. This entry and stages.q5_taxonomy_embedding_crossvalidation_10seed_pooled
+      are the same experiment: same source notebook
+      (detectors/ast-taxonomy-crossvalidation/ast_taxonomy_crossvalidation.ipynb), same source report
+      (detectors/reporting-batch/topk_report.csv, 526 rows), same seeded 70/30 split code for seed in
+      range(10), same reported manual/builtin mean/SD (87.0% / 2.3%, matching
+      manual_builtin_agreement_mean/sd above exactly). Independently reproduced in this session by
+      scripts/regenerate_splits.py --experiment q5_topk --check: all 10 regenerated test sets are an exact
+      set-match to the recorded split_NN_test_ids.txt files. Verification is asymmetric across seeds,
+      same as the parent stage: seed 0's regenerated test set (158 files) exactly matches this repo's own
+      independently-recorded seed-0 evidence
+      (data/labels_scores/q5_taxonomy_crossvalidation_shuffled_seed0_results.csv, see
+      q5_taxonomy_embedding_crossvalidation_shuffled_check above) — a genuine independent cross-check, not
+      just a self-consistent replay. Seeds 1-9's split membership is real and newly recorded here for the
+      first time (previously no split-index artifact existed for those seeds at all, only the notebook's
+      printed aggregate accuracy), but — same caveat as the parent stage — no independently-recorded
+      per-file prediction CSV exists for those 9 seeds to cross-check the split membership itself against;
+      the parent stage's evidence: real_notebook_output is unchanged by this update, since the accuracy
+      figures for seeds 1-9 are still transcribed from printed output, not recomputed from a raw
+      predictions file. split_dir contains split_manifest.json plus split_NN_{train,test}_ids.txt for
+      seeds 00-09.
+
+  semantic_backup:
+    exemplar_registry: data/exemplar_registry/exemplars.csv
+    detector_checkpoint: detectors/semantic-backup
+    backends:
+      stub:
+        description: "bag-of-AST-node-type-and-identifier Counter, cosine similarity — executed in-sandbox"
+        reported_result: "0.77 similarity on a genuinely related pair vs. 0.79 on a genuinely unrelated pair — 'essentially no discriminative power' (source's own words)"
+        source: "semantic_20_07.docx"
+        evidence: real_but_negative_result
+      codebert_colab:
+        description: >
+          microsoft/codebert-base, mean-pooled hidden states — code identical to the sandboxed backend,
+          but actually executed OUTSIDE the sandbox in Google Colab (2026-07-29), where huggingface.co is
+          reachable. NOT the same as the "codebert" entry this file used to carry (which only described
+          the never-run, sandbox-blocked version) — this is a second, independent, real execution.
+        reported_result: "related vs related: 0.9579190015792847; related vs unrelated: 0.9641265273094177 — anisotropy: unrelated code scores HIGHER than related code. A real, negative result, for a structurally different reason than the stub's own negative result (narrow-cone pooled-embedding collapse, not a lack of semantic signal in the tokens themselves)."
+        source: "semantic_29.docx, Prompt 4 (29/07/2026); corroborated by semantic_backup_validation_30.ipynb's own cell-7 markdown (same anisotropy diagnosis, same citations: Ethayarajh 2019, Li et al. 2020, microsoft/CodeBERT GitHub issue #13)"
+        evidence: real_but_negative_result
+        note: >
+          No supplied notebook file exactly reproduces the state that generated this number (Drive-mounted
+          AND raw codebert-base) — the no-suffix notebook lacks the Drive default, and the _30 notebook
+          already has codet5p. The number is real (pasted execution output, quoted verbatim in
+          semantic_29.docx) but the exact intermediate notebook state that produced it was never itself
+          supplied as a file. See detector-version-log.md's "Real-CodeBERT/CodeT5+ Colab validation"
+          section for the full accounting.
+      jina_v2_code:
+        description: "jinaai/jina-embeddings-v2-base-code — proposed as a fix for the codebert anisotropy problem, but never executed. Dropped within the same conversation session in favor of codet5p-110m-embedding before any run."
+        reported_result: null
+        status: NOT_RUN
+        source: "semantic_29.docx, between Prompt 4 and Prompt 5"
+      codet5p_110m_embedding:
+        description: >
+          Salesforce/codet5p-110m-embedding — a contrastively-trained, dedicated code-embedding checkpoint
+          (pre-L2-normalized output), adopted specifically to fix codebert-base's anisotropy problem. Real
+          code exists (semantic_backup_validation_30.ipynb, cell-8), including a documented
+          transformers-compatibility fix (the checkpoint's trust_remote_code config never calls
+          super().__init__(), so four PretrainedConfig attributes are patched onto the loaded AutoConfig by
+          hand — is_decoder, is_encoder_decoder, pad_token_id, eos_token_id — no version pin required; an
+          earlier, unsupplied notebook attempt at pinning transformers is referenced in cell-1 as a dead
+          end, since it dragged in an old tokenizers release needing a Rust toolchain to build on Colab).
+        reported_result: null
+        status: CODE_EXISTS_NOT_VALIDATED
+        note: >
+          No sanity-check similarity number (the "related vs related"/"related vs unrelated" pair) has
+          ever been supplied for this backend. One real similarity comparison WAS run under it — a
+          43-vs-108 novel-correct-vs-genuinely-wrong FindExtremum comparison (mean=0.851/std=0.086 vs.
+          mean=0.930/std=0.027) — but it is explicitly self-flagged, in the same conversation, as contaminated (the
+          broadened "wrong" group is dominated by structurally-correct-but-test-suite-failing submissions,
+          per the paper's own §5.3 finding) and backwards (wrong scored higher than correct). A proposed
+          fix (cross-exercise true negatives, e.g. Q1/Q3) was given as code to hand-apply but was never
+          confirmed as applied or run. No AUC/ROC number exists for this backend in any supplied artifact.
+          UPDATE (2026-09-20): the first sentence above is now out of date — a real sanity-check pair DOES
+          exist for this exact model-loading code (same checkpoint, same trust_remote_code compatibility
+          fix, byte-for-byte matching this entry's own cited semantic_backup_validation_30.ipynb cell 8),
+          just not in that specific unexecuted notebook. It was run in a later, different checkpoint's
+          notebook, detectors/semantic-backup-layer-validation/semantic_backup_layer_validation_with_Results.ipynb,
+          cell 8 (confirmed executed: 17 real outputs, including Hugging Face download logs and the printed
+          result) — related vs related: 0.8398723602294922, related vs unrelated: 0.3819599151611328, a
+          real, clean separation, unlike codebert's anisotropy failure. This is the same number already
+          cited in codet5p_bootstrap_novel_vs_wrong_auc's own reported_result below ("the first-ever
+          codet5p-110m-embedding sanity-check pair") and in that checkpoint's own README — this entry
+          simply hadn't been cross-referenced to it before. Does not change this entry's own status: the
+          43-vs-108 contaminated/backwards comparison described above is still the only result run under
+          THIS specific description, and the fixed, non-contaminated version of that job is the separate,
+          already-real codet5p_bootstrap_novel_vs_wrong_auc stage below (AUC=0.097, also inverted/negative).
+        source: "semantic_backup_validation_30.ipynb; semantic_29.docx Prompt 5 through the 30/07 exchange"
+      exemplar_registry_real_mined:
+        description: >
+          A larger, mined exemplar registry (6 real correct Refactory submissions per competency, pulled
+          via glob from correct/ folders, as referenced inside the codet5p_bootstrap_novel_vs_wrong_auc
+          notebooks above) distinct from this repo's own small hand-written data/exemplar_registry/
+          exemplars.csv (2 competencies, 5 exemplars, as it stood at the time this entry was written).
+        status: MERGED_2026_09_18
+        note: >
+          UPDATE (2026-09-18): data/exemplar_registry/ is no longer the small stub described below -- the
+          full 10-competency/27-exemplar registry (the v3_executed checkpoint's EXEMPLAR_REGISTRY) is now
+          merged in, via scripts/build_exemplar_registry.py; see exemplar_registry_real_mined_v3_executed's
+          own UPDATE note and data/exemplar_registry/README.md for the merge record. The rest of this
+          entry's description and note are left as originally written (2026-08-07 round), describing the
+          state at that time; do not read "CODE_EXISTS_NOT_MERGED" language below as still current.
+          ---
+          A SEPARATE, independent mining implementation was delivered 2026-08-07 —
+          detectors/mine-exemplars/mine_exemplars.py — with its own, different design (resolves
+          each candidate against the live structural resolver, final_score >= 0.999, deduplicates via
+          AST-level alpha-renaming canonical keys, default cap=4 not 6). It has NOT been run against the
+          real Refactory corpus in any supplied artifact (no mined_exemplars.json exists; this sandbox has
+          no Refactory corpus either), and its own CONFIG only covers 6 of the eventual competencies
+          (Accumulation and AccumulateThenCount are explicit TODOs in the script). What IS real and
+          independently re-verified from that round: the hand-written registry it ships alongside was
+          expanded from 5 exemplars/2 competencies to 19 exemplars/8 competencies, a real GuardedInput
+          integrity bug (both original exemplars scored final_score=0.0 — a bare `while` condition, no
+          nested `if`) was found and fixed, and a new audit_registry() utility now exists and is
+          independently confirmed to correctly flag AccumulateThenCount as unverifiable (its competency
+          lives in q2_competencies.py/pw01_competencies.py, never supplied) rather than assume it's fine.
+          See detectors/mine-exemplars/README.md and
+          scripts/regenerate_semantic_backup_exemplar_audit.py. Still short of the "10 competencies, 27
+          exemplars, partly real-mined" state Structural_Competency_Extraction_Paper_v1_2.docx and
+          Competency_Extraction_Methodology_V2.docx describe as finished — those two documents are
+          currently narrative-only for this project (no code/CSV supplied backs their specific numbers),
+          and per Sonia's explicit instruction their claims are NOT folded into Table 4 or the Q5
+          TopKPatternExtended delegation breakdown, both of which remain exactly as previously verified.
+      exemplar_discriminative_validation_lexical:
+        description: >
+          The SAME/CROSS/UNRELATED held-out discriminative-power check (validate_semantic_backup.py,
+          2026-08-07) run against the lexical backend and the expanded 8-competency/19-exemplar
+          hand-written registry above. For every competency with >=2 exemplars, each exemplar is held out
+          and compared against its own competency's remaining exemplars (SAME), other competencies'
+          exemplars (CROSS), and three deliberately unrelated snippets (UNRELATED, string formatting/file
+          IO/a Point class).
+        reported_result: >
+          Pairwise win rate (SAME beats random OTHER, the standard AUC/Mann-Whitney statistic): 470/542
+          (86.7%), verdict "strong discriminative power" — independently reproduced exactly, not merely
+          reported. Worst-case correct ranking (best SAME beats worst of every other comparison, a strict,
+          near all-or-nothing criterion at this registry size): 9/19 (47.4%) — not quoted anywhere in the
+          source conversation, produced independently by this audit's own execution of the delivered code.
+        evidence: real_execution
+        status: INDEPENDENTLY_EXECUTED_AND_CONFIRMED
+        note: >
+          "real_execution" here means: this audit ran the delivered validate_semantic_backup.py directly
+          against the delivered semantic_backup.py's registry and the closest-dated real competency model
+          this repo has (detectors/q1-shared-binding-fix), and it deterministically reproduced
+          the developer's own reported 86.7% figure exactly — stronger than conversation_reported_only (not merely
+          trusting a transcript), but distinct from real_csv/real_notebook_output since no notebook was
+          executed and no CSV backs it; the notebook supplied this round
+          (semantic_backup_validation.ipynb) is confirmed entirely unexecuted by direct JSON inspection
+          (every code cell has execution_count: None, no outputs). The codet5p backend could not be
+          checked the same way — huggingface.co is confirmed blocked from this sandbox too (a direct
+          request returns a 403 at the network proxy). A genuinely open, precisely-characterized question
+          (not resolved, not guessed at): reconstructing the original, pre-fix bare-`while` GuardedInput
+          shape the source conversation describes and resolving it against this repo's own closest-dated real
+          competency.py scores final_score=1.0 in three independent phrasing variants tried, not 0.0 —
+          most likely explained by the developer's session running against a competency.py that predates
+          the Q1 SHARED_BINDING/all_names fix (2026-08-05), consistent with this project's own
+          already-documented "two different working environments" pattern (see
+          provenance/detector-version-log.md's "A direct clarification from Sonia," 2026-09-17), but the exact
+          competency.py version actually used was never supplied, so this remains a hypothesis, not a
+          settled fact. See detectors/mine-exemplars/README.md for the full writeup.
+
+          UPDATE (second mine_exemplars batch, content-dated 2026-08-09, delivered 2026-09-17): this
+          hypothesis is now CONFIRMED, not merely plausible. The actual competency.py/test_real_data.py
+          this development session ran against was supplied this round
+          (detectors/mine-exemplars-real-corpus/original_files_used_this_round/) and is
+          byte-for-byte identical (0 diff lines) to detectors/fixq4 — confirming it predates
+          the Q1 fix, exactly as hypothesized. Direct execution against that exact file reproduces
+          final_score=0.0 for the bare-while reconstruction, exactly as originally claimed. The mechanism:
+          the Q1 fix's diff shows it added a brand-new `elif isinstance(node, ast.While):` branch to the
+          TEST primitive detector (synthesizing TEST evidence from a while loop's own condition); fixQ4's
+          version has no such branch, so a bare while with no nested if genuinely produces zero TEST
+          evidence. Left the original paragraph above unedited, per this project's evidence-preservation
+          discipline — it was a correct hypothesis, now proven. See
+          detectors/mine-exemplars-real-corpus/README.md and
+          scripts/regenerate_semantic_backup_v2_audit.py.
+        source: "mine_exemplars.docx (dev-session transcript, 2026-08-07); independently re-executed in this audit; resolved with hard evidence via a second batch, content-dated 2026-08-09, delivered 2026-09-17"
+      exemplar_registry_real_mined_v2:
+        description: >
+          A second mine_exemplars batch ("A second version is here," delivered 2026-09-17,
+          content-dated 2026-08-08/09): real Refactory corpus mining for four Q2 competencies
+          (ConditionalCount, AccumulateThenCount, FunctionalUniqueCheck [new], DelegatesUniqueness [new,
+          cross-function]), delivered as detectors/mine-exemplars-real-corpus/. The delivered
+          semantic_backup.py's EXEMPLAR_REGISTRY is now, confirmed by direct inspection, 10
+          competencies / 27 exemplars — the exact figure Structural_Competency_Extraction_Paper_v1_2.docx
+          and Competency_Extraction_Methodology_V2.docx described as a finished future state. That state
+          is now backed by real, delivered, independently runnable code for the exemplar registry itself
+          (not for Table 4, the Q5 breakdown, or the real-corpus mining scan counts below, none of which
+          this round touches).
+        reported_result: >
+          Real-corpus scan counts (conversation_reported_only, no corpus ever supplied to this sandbox):
+          ConditionalCount 248/291 (85%, 66 shapes); AccumulateThenCount 2/291 (both the same shape --
+          confirmed independently against unique_month per the conversation); FunctionalUniqueCheck 13/291
+          (4.5%, 11 shapes); DelegatesUniqueness 227/291 (78%, 96 shapes). A second, independent integrity
+          bug (like GuardedInput's in the first round): 2 of 3 original AccumulateThenCount exemplars
+          also scored final_score=0.0 (len()-based, not the required .count( substring) -- now corrected.
+        evidence: real_csv
+        status: PARTIALLY_INDEPENDENTLY_VERIFIED
+        note: >
+          "real_csv" here refers specifically to the delivered semantic_cache.zip's codet5p.pkl/lexical.pkl
+          -- real, content-hash-keyed embedding caches (confirmed by unpickling: 24 entries each, correct
+          dimensionality for LexicalEmbedder/codet5p-110m-embedding), not a literal CSV, but the same
+          evidentiary tier: real preserved model output, independently reprocessed by this audit rather
+          than re-typed from the transcript. Using ONLY those cached vectors (a guard raises loudly if
+          anything uncached is requested, so no live network call or fabricated value could sneak in),
+          this audit reproduced the conversation's reported codet5p numbers for the 8-competency subset the cache
+          actually covers EXACTLY: 696/852 (81.7%) pairwise win rate, 16/21 (76.2%) worst-case ranking,
+          all 5 named failure lines. Separately, the lexical backend (deterministic, no cache needed)
+          reproduced the conversation's reported numbers for the FULL current 10-competency/27-exemplar registry
+          EXACTLY: 1262/1428 (88.4%) pairwise win rate, 15/27 (55.6%) worst-case ranking, all 12 named
+          failure lines. NOT independently checkable: the 10-competency codet5p run (84.2%/81.5%) --
+          FunctionalUniqueCheck/DelegatesUniqueness have no cached codet5p vectors in the delivered cache,
+          and huggingface.co remains blocked from this sandbox. Also NOT independently checkable: the
+          real-corpus mining scan counts above (no corpus ever supplied), and AccumulateThenCount/
+          FunctionalUniqueCheck/DelegatesUniqueness's own exemplars via audit_registry() against a live
+          model -- the delivered "real chain" (test_real_data.py -> pw01_competencies.py ->
+          q2_competencies.py) does not actually run in this sandbox: pw01_competencies.py has unresolved
+          relative imports (`from .core import ...`, `from .base_competencies import model, show`) to
+          submodules never supplied to this project, confirmed by direct import attempt (ImportError).
+          Also NOT delivered in this batch, despite being described in the conversation as implemented/shipped: a
+          DelegatesUniqueness/ConditionalCount surface-containment scoping fix (reported lexical
+          90.6%/74.1%, grep-confirmed absent from the delivered semantic_backup.py) and three documents
+          (semantic_backup_findings_v4.docx, an edited Structural_Competency_Extraction_Paper_v1.docx,
+          DOCUMENT_INDEX.md). See detectors/mine-exemplars-real-corpus/README.md and
+          scripts/regenerate_semantic_backup_v2_audit.py.
+        source: "the second mine_exemplars conversation transcript (content-dated 2026-08-08/09, delivered 2026-09-17); independently re-executed and cache-verified in this audit"
+      exemplar_registry_real_mined_v3_executed:
+        description: >
+          A third delivery, "here is the last version of semantic_backup_validation notebook" (delivered
+          2026-09-17, no accompanying conversation, no docx metadata -- dated by delivery, content places it after
+          the v2 batch above). The FIRST genuinely executed copy of this notebook this project has ever
+          received (20 cells, 10 code cells, execution_count 1-10, 9/10 with real outputs -- every earlier
+          copy was confirmed entirely unexecuted). Self-contained: embeds competency.py, test_real_data.py,
+          report.py, pw01_competencies.py, q2_competencies.py directly (no upload step), and confirmed to
+          embed this repo's own CURRENT HEAD structural model
+          (detectors/q5-delegation-clustering-fix for competency.py/test_real_data.py,
+          detectors/semantic-backup for report.py -- substantively identical, diff-confirmed,
+          not the pre-Q1-fix snapshot both earlier mine_exemplars rounds turned out to use). Two real fixes
+          land here for the first time: (1) pw01_competencies.py's broken relative imports
+          (`from .core import ...`) are fixed to `from competency import ...` / `from test_real_data
+          import ...` -- confirmed by direct execution that the full chain now imports cleanly in this
+          sandbox, which it could not do in the v2 round; (2) the DelegatesUniqueness/ConditionalCount
+          surface-containment scoping fix (DELEGATING_FUNCTION + runtime_scoped_exemplar()), which v2's
+          conversation described as implemented and tested but was grep-confirmed ABSENT from v2's own delivered
+          semantic_backup.py, is now present as real code and wired into both semantic_backup_score() and
+          validate_semantic_backup.py.
+        reported_result: >
+          audit_registry() now reports ZERO problems against the complete real chain -- all 10
+          competencies, all 27 exemplars verify clean -- for the first time ever in this project (every
+          earlier round could only check 7-8 of 10 competencies; AccumulateThenCount/FunctionalUniqueCheck/
+          DelegatesUniqueness were structurally unreachable before this round's import fix). Lexical,
+          post-scoping-fix: pairwise win rate 1294/1428 (90.6%), worst-case ranking 20/27 (74.1%) -- ZERO
+          of the 7 remaining failures involve DelegatesUniqueness (down from 5 of 12 in v2's pre-fix run),
+          confirming the fix specifically removes that one confound and nothing else. Codet5p,
+          post-scoping-fix, full 10-competency: pairwise win rate 1202/1428 (84.2%), worst-case ranking
+          22/27 (81.5%) -- matches v2's conversation-reported "after fix" figure exactly, now backed by a genuinely
+          executed notebook rather than a transcript. Three synthetic TopKPatternExtended structural
+          regression cases (Section 5.3, explicitly labeled "structural, not semantic-similarity" in the
+          notebook itself, and independently reproduced exactly against this repo's current model): a
+          delegate-based helper (TopKViaDelegate fires), a pure-recursion quicksort helper (SortThenSlice
+          only, isolating the SELF_RECURSIVE case), and a merge-sort helper reproducing the already-
+          documented Table-5/S8 false positive. None of these three change any real corpus-derived
+          percentage; they are demonstration checks against the unmodified model.
+        evidence: real_notebook_output
+        status: PARTIALLY_INDEPENDENTLY_VERIFIED
+        note: >
+          The audit_registry clean result, the full lexical numbers (1294/1428, 20/27, all 7 failure
+          lines, the absence of any DelegatesUniqueness failure), and all three TopKPatternExtended
+          regression cases were INDEPENDENTLY REPRODUCED by direct execution in this sandbox (evidence
+          those specific items is closer to real_execution) -- see
+          scripts/regenerate_semantic_backup_v3_audit.py, 19/19 checks passing. The codet5p numbers
+          (84.2%/81.5%) and the moyenne()/DelegatesUniqueness codet5p similarity smoke-test values (0.42,
+          0.97, 0.975/0.977/0.961) could NOT be independently re-run -- huggingface.co remains blocked
+          from this sandbox -- and are recorded at evidence: real_notebook_output specifically for those
+          sub-claims (real download/weight-loading logs and execution_count in the delivered notebook
+          itself, not a re-typed transcript, but not independently re-executed either). The real-corpus
+          mining scan counts remain exactly as v2 recorded them (conversation_reported_only) -- this notebook
+          validates the already-mined registry, it does not re-run mining. This checkpoint has NO
+          independent dating evidence beyond its delivery date (no conversation transcript, no docx metadata) --
+          named detectors/semantic-backup-validation-executed/ by delivery date; its content
+          (embedding the v2 registry plus the scoping fix v2's conversation only described) places it
+          chronologically after v2 regardless of its unknown exact date. Table 4 and the Q5
+          TopKPatternExtended delegation breakdown are untouched by any of this.
+          UPDATE (2026-09-18): this checkpoint's EXEMPLAR_REGISTRY (10 competencies, 27 exemplars) is now
+          merged into data/exemplar_registry/exemplars.csv + code/, mechanically, via
+          scripts/build_exemplar_registry.py -- see exemplar_registry_real_mined below for the merge
+          record. This does not change anything reported above; it makes the same registry this entry
+          already describes available as this repo's own populated data/ files.
+        source: "semantic_backup_validation.ipynb, delivered 2026-09-17 with no accompanying conversation transcript; independently re-executed and audited in this session"
+      codet5p_bootstrap_novel_vs_wrong_auc:
+        description: >
+          Salesforce/codet5p-110m-embedding, a redesigned attempt at the semantic backup layer's actual
+          job (separating novel-correct from genuinely-wrong FindExtremum/Q5 submissions), fixing both
+          problems flagged against codet5p_110m_embedding above: (1) the negative class is ALL
+          wrong-labeled submissions, not filtered to "also 0 structurally" (the filter that contaminated
+          the earlier comparison); (2) the exemplar registry is bootstrapped across 10 independent draws
+          of N_EXEMPLARS=8 real correct submissions (excluded from the novel_correct scoring pool),
+          reporting AUC as a mean +/- SD across draws, plus a separate pooled AUC/ROC across all draws
+          combined. Real code, in two forms: the originally-supplied unexecuted copy
+          (detectors/semantic-backup-layer-validation/Copie_de_semantic_backup_layer_validation.ipynb)
+          and, supplied in a later round, the actually-executed notebook
+          (semantic_backup_layer_validation_with_Results.ipynb) with real printed/plotted output. (Both
+          files were re-supplied and renamed in a still-later round to match this project's Copie_de_ =
+          unexecuted / _with_Results = executed convention; content is byte-identical to the originally
+          logged uploads -- see the checkpoint README's "A naming correction" section.)
+        reported_result: >
+          Bootstrap AUC (10 draws): mean=0.098, SD=0.039. Pooled AUC across all 10 runs (1,510 scored
+          pairs): 0.097. Per-run group means: novel_correct ~0.79-0.81 max-similarity, genuinely_wrong
+          ~0.94-0.96 -- genuinely-wrong submissions are SYSTEMATICALLY MORE similar to correct exemplars
+          than novel-correct submissions are (AUC near 0, not near 0.5, means a real, strong separation --
+          just backwards from what the layer's design assumes). Suggested threshold for ~80%
+          novel-correct recall: 0.719, at a false-positive rate of 0.997 -- not a useable filter as
+          designed. Also newly real this round: the first-ever codet5p-110m-embedding sanity-check pair
+          for THIS notebook's own model load -- related vs related: 0.8399, related vs unrelated: 0.3820
+          (a real, usable separation, unlike codebert's anisotropy failure above).
+        evidence: real_csv
+        status: REAL_INVERTED_RESULT_CSV_BACKED
+        data_file:
+          - detectors/semantic-backup-layer-validation/semantic_backup_bootstrap_summary.csv
+          - detectors/semantic-backup-layer-validation/semantic_backup_pooled_scores.csv
+        regenerate_script: scripts/regenerate_semantic_backup_auc.py
+        source: "Semantic Backup_Second Role_08_08_Before_clustering.docx (08/08/2026), quoting 'Result of cell 13' and 'result of cell 15'; semantic_backup_layer_validation_with_Results.ipynb (real execution output, renamed from Copie_de_semantic_backup_layer_validation.ipynb in a later round -- see the checkpoint README); semantic_backup_bootstrap_summary.csv + semantic_backup_pooled_scores.csv (real per-run/per-file predictions, supplied in a later round)"
+        note: >
+          The first real AUC/ROC number this project has ever produced for the semantic backup layer's
+          actual novel-vs-wrong separation task -- resolves, with an honest inverted-negative answer, the
+          "no valid AUC yet" gap this note used to describe. Upgraded from evidence: conversation_reported_only to
+          real_csv once the raw bootstrap-summary and pooled-scores CSVs, and the actually-executed
+          notebook, were supplied in a later round -- scripts/regenerate_semantic_backup_auc.py
+          independently recomputes every per-run AUC, the group means, the mean/SD across runs, the pooled
+          AUC, and the ~80%-recall threshold directly from the raw per-file rows (no ML library
+          dependency, a from-scratch Mann-Whitney-U AUC implementation), all matching to floating-point
+          precision. One real, still-UNRESOLVED discrepancy even with the executed notebook in hand: every
+          code cell's execution_count is None despite having real, populated outputs (confirmed by direct
+          JSON inspection) -- so the conversation's own cell numbering ("cell 13", "cell 15") still cannot be
+          checked against this notebook's own 11 code cells under any obvious counting convention. A real,
+          diff-confirmed difference between the two notebook copies exists too, the same kind found in the
+          Q4/Q2 embedding round: a Drive folder-path fix (refactory/data/question_5/code ->
+          data/question_5/code). A separate, purely cosmetic correction in a still-later round: both
+          notebooks were re-supplied renamed to Copie_de_semantic_backup_layer_validation.ipynb (unexecuted)
+          / semantic_backup_layer_validation_with_Results.ipynb (executed), resolving the previously-flagged
+          reversed-naming-convention discrepancy vs. the Q4/Q2 embedding round -- verified by md5sum to be a
+          pure rename, no content change. See
+          detectors/semantic-backup-layer-validation/README.md and
+          provenance/detector-version-log.md's "Semantic backup layer validation" section for the full
+          writeup.
+      novel_correct_clustering:
+        description: >
+          A real §11 added to the same notebook, in a still-later round: hierarchical clustering (cosine
+          distance) of Q5's 43 correct-labeled "novel" submissions' embeddings, asking whether they form
+          coherent sub-clusters rather than each being a genuinely one-off strategy -- a discovery-tool use
+          of the embedding model, distinct from every taxonomy-validation or AUC use elsewhere in this
+          project. Real code, in two forms, both supplied: the unexecuted copy
+          (detectors/semantic-backup-layer-validation/Copie_de_semantic_backup_layer_validation_after_clustering.ipynb)
+          and the executed copy
+          (semantic_backup_layer_validation_after_clustering_with_Results.ipynb) with real printed/plotted
+          output, including one code cell (a distance-threshold cut) added interactively during the conversation
+          session itself, present only in the executed copy.
+        reported_result: >
+          Silhouette-score sweep (k=2..9) picked k=9 (score=0.599) -- but flagged as a methodological trap,
+          not trusted at face value: scores were still rising at the edge of the tested range (0.389, 0.440,
+          0.488, 0.531, 0.536, 0.545, 0.508, 0.599), the textbook signature of silhouette overfitting toward
+          small clusters on n=43. Cutting the same dendrogram by distance threshold (0.30) instead recovered
+          4 clusters: {correct_5_192, correct_5_247} (2 files), {correct_5_011, correct_5_016} (2 files),
+          one dominant 38-file cluster, {correct_5_029} (1 file). Reading real files from the 38-file
+          cluster found a delegation pattern (top_k calls a differently-named helper and slices the
+          result) invisible to inline structural resolution -- leading directly to the real code fix at
+          semantic_backup.backends' sibling stage, configs/stage_manifest.yaml's own Q5 table-4 entry
+          (q5_final_extended) and detectors/q5-delegation-clustering-fix/.
+        evidence: real_notebook_output
+        status: REAL_DISCOVERY_LED_TO_CODE_FIX
+        source: "Chat_Semantic_Backup_Second_Role_08_08_After_clustering.docx (no internal date header; dated by the same-day internal-metadata chain -- see the checkpoint README); Copie_de_semantic_backup_layer_validation_after_clustering.ipynb (unexecuted) + semantic_backup_layer_validation_after_clustering_with_Results.ipynb (real execution output, independently extracted and cross-checked against the conversation's own quoted cluster listing -- exact match)"
+        note: >
+          Unlike codet5p_bootstrap_novel_vs_wrong_auc above, no standalone embeddings/distance-matrix/
+          cluster-membership CSV was ever saved by this notebook -- the dendrogram chart image and the
+          printed distance-cut cluster listing, both extracted directly from the executed notebook's own
+          real output, are the only preserved artifacts, so evidence is real_notebook_output rather than
+          real_csv (there is no smaller raw file to independently regenerate this specific step from). The
+          DOWNSTREAM code fix this clustering led to is, however, fully real_csv-verified on its own terms
+          -- see detectors/q5-delegation-clustering-fix/README.md and
+          scripts/regenerate_q5_delegation_breakdown.py. Same persisting anomaly as every other executed
+          notebook in this project: every code cell's execution_count is None despite real, populated
+          outputs. See detectors/semantic-backup-layer-validation/README.md's "The clustering
+          extension" section and provenance/detector-version-log.md for the full writeup.
+    default_backend: stub
+    note: >
+      The finished paper (Structural_Competency_Extraction_Paper.docx) explicitly defers ALL
+      embedding-model semantic-backup validation to a separate, still-unsupplied "companion paper" — the
+      q4_sortbykey_splits/q5_topk_splits sections above almost certainly belong to that companion paper,
+      not to this one, and are NOT the same experiment as the codebert_colab/codet5p_110m_embedding work
+      above (that is an exemplar-similarity-threshold/ROC validation, not a train/test-split experiment).
+      UPDATE (2026-09-20): the "almost certainly belong to that companion paper" guess above was wrong —
+      table5.q4_sortbykey_splits/q5_topk_splits are now confirmed to be the AST-taxonomy embedding
+      cross-validation experiments (q4/q5_taxonomy_embedding_crossvalidation_10seed_pooled), not
+      companion-paper novel-detection work. This paragraph's separate point — that they are NOT the same
+      as this section's own codebert_colab/codet5p_110m_embedding exemplar-similarity work — remains
+      correct and is unaffected; see table5.q4_sortbykey_splits' note in this file for the full evidence.
+      As of 2026-08-08: four real backend/analysis passes exist (the stub and codebert_colab, both honest
+      negative results; codet5p_bootstrap_novel_vs_wrong_auc's real, `evidence: real_csv` inverted
+      AUC=0.097 finding — the first actual AUC this project has produced for the layer's real job, a
+      strong negative result, independently verified from the raw per-run/per-file CSVs and the executed
+      notebook itself, see scripts/regenerate_semantic_backup_auc.py; and novel_correct_clustering's real,
+      `evidence: real_notebook_output` clustering discovery, which — unlike the other three — is not
+      itself part of the semantic backup layer's validation at all: it uses the same embedding model as a
+      discovery tool pointed at Q5's own structural-layer gap, and its real payoff is a real STRUCTURAL
+      code fix, not a semantic-layer result — see detectors/q5-delegation-clustering-fix/ and
+      configs/stage_manifest.yaml's own q5_final_extended stage). codet5p_110m_embedding's own earlier, separately
+      self-flagged-contaminated comparison remains superseded by the bootstrap attempt above. Do not read
+      any of this as a validated, deployable codet5p/CodeBERT semantic-backup result — none
+      exists in any artifact supplied to this project as of this writing. See
+      ../provenance/detector-version-log.md's "Real-CodeBERT/CodeT5+ Colab validation" section for full detail.
+    required_for_publication: true

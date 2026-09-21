@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite the paper below."
+title: "Result Regeneration Repository for AST-Based Competency Extraction"
+type: software
+authors:
+  - family-names: "Achiri"
+    given-names: "Sonia"
+    affiliation: "Badji Mokhtar-Annaba University / National Higher School of Technology and Engineering, Annaba, Algeria"
+    email: "sonia.achiri@univ-annaba.dz"
+preferred-citation:
+  type: article
+  title: "Programming Competency Modelling and Extraction: A Hybrid Structural-Semantic Framework for Student Source Code Analysis"
+  authors:
+    - family-names: "Achiri"
+      given-names: "Sonia"
+      affiliation: "Badji Mokhtar-Annaba University / National Higher School of Technology and Engineering, Annaba, Algeria"
+    - family-names: "Azizi"
+      given-names: "Nabiha"
+    - family-names: "Bouacha"
+      given-names: "Ismail"
+    - family-names: "Aissaoui"
+      given-names: "Lamia"
+  year: 2026
+  journal: "International Journal of Intelligent Engineering and Systems (IJIES)"
+  # NOTE: the manuscript is currently at the Major Revision stage (received 2026-08-19),
+  # so the DOI/volume/issue in the paper draft are still placeholders
+  # ("10.22266/ijies2019.xxxx.xx"). Fill in doi/volume/issue/start-page/end-page here
+  # once the journal assigns them at final acceptance.
+version: "v1"
+date-released: "<<FILL: date this repository is actually published/pushed to GitHub>>"
+repository-code: "https://github.com/SoniaAchiri/Programming-Competency-Modelling-and-Extraction"

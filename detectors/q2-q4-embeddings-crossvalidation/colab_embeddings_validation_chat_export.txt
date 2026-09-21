@@ -1,0 +1,252 @@
+05/08/2026 at 17:40
+
+2. The Colab embeddings validation: Now, let's continue the colab
+embeddings validation with these new Results after batch_repot for Q1 to
+Q4?
+
+First, a scoping note before I build anything — not every question has
+an analogous experiment to run here.
+
+What made Q5's embeddings check meaningful: FindExtremum genuinely
+splits into two real, well-populated strategies (manual loop vs.
+max()/min()), so there was a real taxonomic distinction worth asking an
+independent method to recover.
+
+Checking which of Q1–Q4 actually have that same shape:
+
+-   Q4 — yes, directly analogous. SortByKey = ANY(BubbleSortPass,
+    TopKPattern) is exactly the same shape as Q5: two real,
+    well-populated strategies (13.1% vs. 64.4%). This is the most
+    natural extension.
+
+-   Q2 — yes, with one adjustment. UniqueCheck has three branches, but
+    AccumulateThenCount is only 0.7% (~2 files) — too rare for a stable
+    centroid, the same problem novel had in Q5. I can infer the
+    "functional" label from your existing q2_report.csv columns by
+    elimination (UniqueCheck=1.0 but neither ConditionalCount nor
+    AccumulateThenCount matched) without needing a new batch run — but
+    I'd frame it as a clean 2-way split (counter vs. functional),
+    dropping the rare accumulate group the same way we dropped novel's
+    instability from Q5's headline number.
+
+-   Q1 and Q3 — not a good fit, and I don't want to force one. Both are
+    single-strategy competencies (GuardedInput/LinearSearch,
+    SelectionStep) — their real finding was a structural-matching bug
+    (flipped comparisons, compound conditions), not a taxonomic split
+    between multiple legitimate strategies. There's nothing analogous
+    for an embedding model to independently "recover" there; running the
+    same experiment would just be checking whether embeddings agree with
+    themselves on an arbitrary threshold, not validating a real
+    distinction.
+
+So: I'll build this for Q4 and Q2, reusing the exact multi-seed
+methodology we already validated for Q5 (10 random 70/30 splits, pooled
+confusion matrix). Let me put together the notebook.Let me verify the
+exact columns in your uploaded CSVs before writing the label logic, to
+make sure it'll actually work against your real files. Confirmed —
+exactly the columns my elimination logic needs. Let's build the
+notebook. Let's validate the notebook is well-formed before
+delivering.Well-formed, 20 cells, structure is correct. Let's finalize.
+Structure of the notebook:
+
+1.  §1–3: same setup/Drive-mount/embedding-model pattern as your other
+    notebooks — should feel familiar to run
+
+2.  §4: I factored the multi-seed classification logic into a reusable
+    function (run_multiseed_crossvalidation) rather than copy-pasting
+    the loop twice, since Q2 and Q4 need the exact same procedure with
+    different inputs
+
+3.  §5 (Q4): labels come straight from your existing q4_report.csv
+    columns, no inference needed
+
+4.  §6 (Q2): labels for functional are inferred by elimination (matched
+    UniqueCheck but neither other branch) — flagged clearly with a
+    markdown warning about the small sample size before you run it, so
+    you go in with the right expectations rather than being surprised by
+    instability the way novel surprised us in Q5
+
+One thing to watch for when you run it: both Q2 and Q4 sections assume
+your Drive folder has the real .py files under
+refactory/data/question_2/code/{correct,wrong}/ and
+refactory/data/question_4/code/{correct,wrong}/ — same layout as Q5. If
+Q2/Q4's data lives somewhere else in your Drive (the way Q1's did
+initially), you'll hit the same "0 cached embeddings" symptom we
+debugged before — check the print(f"cached {len(...)} of {len(...)}
+files") output after each embedding cell before moving on.
+
+Run it and send me both summaries (the per-seed table + pooled confusion
+matrix for each) — I'd expect Q4 to land somewhere in the same range as
+Q5's manual/builtin result, and Q2's functional class to behave more
+like Q5's unstable novel group, given the sample size
+
+Result for Q4:
+
+strategy_label
+
+topk 420
+
+bubblesort 69
+
+Name: count, dtype: int64
+
+seed accuracy n_test
+
+0 0 0.931973 147
+
+1 1 0.918367 147
+
+2 2 0.931973 147
+
+3 3 0.952381 147
+
+4 4 0.945578 147
+
+5 5 0.959184 147
+
+6 6 0.911565 147
+
+7 7 0.897959 147
+
+8 8 0.952381 147
+
+9 9 0.959184 147
+
+accuracy: mean=0.936 std=0.021
+
+pooled confusion matrix [rows=true, cols=predicted] (1470 predictions
+across 10 seeds)
+
+bubblesort topk
+
+bubblesort 200 4
+
+topk 90 1176
+
+precision recall f1-score support
+
+bubblesort 0.69 0.98 0.81 204
+
+topk 1.00 0.93 0.96 1266
+
+accuracy 0.94 1470
+
+macro avg 0.84 0.95 0.89 1470
+
+weighted avg 0.95 0.94 0.94 1470
+
+This is a genuinely strong result — stronger than Q5's manual/builtin
+check, and worth highlighting as such.
+
+Headline comparison:
+
+  ------------------------------------------------------------------------
+                          Q5 (manual/builtin)     Q4 (bubblesort/topk)
+  ----------------------- ----------------------- ------------------------
+  Mean accuracy           87.0% ± 2.3%            93.6% ± 2.1%
+
+  Range                   82.6%–89.8%             89.8%–95.9%
+
+  Sample size (pooled)    1,441                   1,470
+  ------------------------------------------------------------------------
+
+Q4's split is recovered more reliably by an independent embedding method
+than Q5's was — both the mean is higher and the spread is comparably
+tight, so this isn't a fluke from a lucky run.
+
+Reading the confusion matrix — there's an interesting asymmetry,
+opposite in direction from what we saw in Q5:
+
+-   topk: precision 1.00, recall 0.93 — when the model predicts topk,
+    it's always right (1,176/1,176). It misses 90 real topk submissions,
+    predicting bubblesort instead.
+
+-   bubblesort: precision 0.69, recall 0.98 — when a submission is
+    genuinely bubblesort, the model almost always catches it (200/204).
+    But it's a "greedy" label — 90 real topk submissions get swept into
+    it too, dragging precision down.
+
+So bubblesort is acting like the "broad, easy-to-fall-into" cluster, and
+topk is the "narrow, only-matched-when-truly-similar" cluster. That's
+the reverse of Q5, where builtin (analogous role) was the tight cluster
+and manual was the broad one. Makes some sense structurally: real
+bubble-sort implementations are fairly homogeneous (nested loops, a
+comparison, a swap — not much room for variation), while the "find max,
+remove, append" topk strategy admits more surface variety (different
+ways to find the max, different removal idioms) — so a topk submission
+that happens to look a bit unusual can drift close enough to the tighter
+bubblesort cluster to get misclassified there.
+
+For the paper, if this goes in: this is actually a nicer story than Q5's
+— a higher, tighter number, plus a genuinely informative asymmetry that
+runs the opposite direction, which itself makes for a good comparative
+point ("cluster tightness, not correctness, drives asymmetric
+misclassification — and which strategy is the 'tight' one isn't fixed,
+it depends on how much real-world implementation variety that specific
+strategy actually admits").
+
+Send me the Q2 results:
+
+strategy_label
+
+counter 564
+
+functional 17
+
+Name: count, dtype: int64
+
+This confirms the sample-size warning — and the headline accuracy number
+here is actually misleading, worth being very careful about before this
+goes anywhere near the paper.
+
+The 95.9% accuracy is almost entirely a class-imbalance artifact, not a
+real signal. counter is 96.8% of the pooled test set (1,694/1,750). A
+model that always predicted counter, regardless of input, would score
+~96.8% accuracy — actually higher than what this classifier achieved. So
+"96% accuracy" here doesn't mean the model recovered the taxonomic
+split; it means the majority class dominates the metric.
+
+The number that actually matters is functional's own precision/recall —
+and it's close to uninformative:
+
+-   Precision 0.33, recall 0.27 — the model correctly identifies only
+    ~15 of 56 pooled functional test examples, and over two-thirds of
+    what it labels functional is actually mislabeled counter.
+
+-   Both directions of error are present in similar magnitude (31
+    counter→functional, 41 functional→counter) — no clean asymmetric
+    pattern like Q4's cluster-tightness story, which is consistent with
+    this being noise from too few examples rather than a real,
+    interpretable structural finding.
+
+Compare all three checks side by side:
+
+  ---------------------------------------------------------------------------
+                     Q5               Q4 bubblesort/topk Q2
+                     manual/builtin                      counter/functional
+  ------------------ ---------------- ------------------ --------------------
+  Minority class     151 (builtin)    204 (bubblesort)   17 (functional)
+  size                                                   
+
+  Minority           0.75/0.88        0.69/0.98          0.33/0.27
+  precision/recall                                       
+
+  Verdict            Real, stable     Real, stable, even Inconclusive
+                                      stronger           
+  ---------------------------------------------------------------------------
+
+My honest recommendation: don't report this as a finding at all,
+positive or negative. It's not "the model fails to recover the
+counter/functional split" — it's "17 real examples is not enough to
+determine whether it can." Reporting 95.9% accuracy would overstate a
+null result as a positive one; reporting the 0.33/0.27 precision/recall
+as evidence of failure would overstate a sample-size limitation as a
+modeling one. Both would be misleading in different directions.
+
+If you want this documented anywhere, the honest version belongs in
+Limitations, not Results — something like: "A similar check was
+attempted for Q2's counter/functional split, but the functional-strategy
+sample (17 real submissions) proved too small to support a stable
+conclusion either way — a data limitation, not a validated finding."
+That's consistent with how we already handled Q1's smaller
+while-condition gap (8 files) and Q5's novel group.

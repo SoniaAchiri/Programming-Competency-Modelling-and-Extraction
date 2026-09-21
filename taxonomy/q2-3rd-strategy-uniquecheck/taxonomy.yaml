@@ -1,0 +1,37 @@
+# Taxonomy snapshot — Q2 (occurrence counting) taxonomy correction, as of the
+# "files_Q2_competencies_3rd strategie" detector checkpoint (2026-07-28, same round as fixQ2)
+#
+# Regenerated from ../../provenance/detector-version-log.md, section "## Q2 fix + third strategy".
+
+status: current_for_Q2
+supersedes: taxonomy/v1.0.0-baseline (ConditionalCount, Q2 only)
+detector_checkpoint: detectors/q2-3rd-strategy
+
+competencies:
+  - name: UniqueCheck
+    question: 2
+    task: "Unique day / unique month (occurrence counting)"
+    composition: composite
+    definition: "UniqueCheck = ANY(ConditionalCountStep, AccumulateThenCount, FunctionalUniqueCheck)"
+    strategies:
+      - name: ConditionalCountStep
+        description: "explicit counter (level-2 lift of the original ConditionalCount)"
+        real_coverage_pct: 85.2
+      - name: AccumulateThenCount
+        description: "tuple-accumulate-then-.count()"
+        real_coverage_pct: 0.7
+      - name: FunctionalUniqueCheck
+        description: "functional map()/filter() pipeline, 3 sub-shapes (inline / guarded / inline-in-test)"
+        real_coverage_pct: 4.5
+    combined_real_coverage_pct: 90.4
+    coverage_source: >
+      Conversation-reported (The_output_Results_26.docx), quoting "validated against all 291 real Q2 submissions
+      with proper function scoping." 291 matches the Refactory Q2 corpus total (291 correct) everywhere
+      else this project cites it. NO BATCH SCRIPT OR CSV for this specific run has been supplied by any
+      source as of this writing — the percentage is real (independently corroborated by three separate
+      documents: The_output_Results_26.docx, Competency_Extraction_Methodology.docx's §6.2, and
+      Structural_Competency_Extraction_Paper.docx's §5.4) but not yet regenerable from this repo alone.
+    open_question: >
+      A stale, pre-correction "33%" figure appears in two later documents with opposite readings of what
+      it originally meant (counter-strategy share vs. alternative-strategy share) — see the log's dedicated
+      write-up. Does not affect the 85.2%/0.7%/4.5%/90.4% figures above, which supersede it either way.

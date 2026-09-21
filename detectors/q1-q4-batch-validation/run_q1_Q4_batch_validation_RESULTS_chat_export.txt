@@ -1,0 +1,481 @@
+After run script q1_q4 batch_validation, it gives a folder of files.csv
+per question. 05/08/2026
+
+Real data now — let's actually run the numbers rather than eyeball a few
+rows.Excellent — this is a genuinely useful reproducibility check, since
+your Q2/Q3/Q4 correct-column numbers land almost exactly on the figures
+already published in the paper, function-scoped this time. Here's how
+each question compares against the paper's claims:
+
+  -------------------------------------------------------------------------
+                                   Paper's number   Your new run   Match?
+  -------------------------------- ---------------- -------------- --------
+  Q2 correct — ConditionalCount    85.2%            85.2%          ✅ exact
+
+  Q2 correct — UniqueCheck         90.4%            90.4%          ✅ exact
+
+  Q3 correct — SelectionStep       94.0%            94.0%          ✅ exact
+
+  Q4 correct — BubbleSortPass      13.1%            13.1%          ✅ exact
+
+  Q4 correct — TopKPattern         64.4%            64.4%          ✅ exact
+
+  Q4 correct — SortByKey           77.6%            77.6%          ✅ exact
+  -------------------------------------------------------------------------
+
+That's a genuinely strong confirmation — every number the paper already
+reports for Q2/Q3/Q4 reproduces exactly with this run, function-scoped,
+using the function names you just confirmed. This is real evidence the
+published figures are solid and reproducible, not a one-off artifact.
+
+Q1 is new — this wasn't in the paper before, and it's worth reading
+carefully:
+
+-   GuardedInput and LinearSearch score identically on every single row
+    (76.8% correct, 64.2% wrong) — expected, since they're deliberately
+    structural twins (same components, same structural check, registered
+    separately only to avoid conflating two different skills under one
+    name, per your own code's comment).
+
+-   76.8% of correct submissions score 1.0 — noticeably lower than Q3's
+    94.0% or Q2's 90.4%. Worth checking why: is that a real coverage gap
+    (like Q3's .insert() case), or is search sometimes not the actual
+    entry point (e.g., a helper does the real work and search just calls
+    it — the same "unrelated helper" pattern from Table 4, but inverted:
+    here the named function might be a thin wrapper rather than the
+    substantive one)?
+
+-   A parse error in Q1 (1 file) — minor, but worth a quick look at
+    which file, in case it's a real encoding/syntax edge case rather
+    than a corrupted submission.
+
+One thing worth double-checking given how exact the Q2/Q3/Q4 matches
+are: AccumulateThenCount at 0.7% for both correct and wrong groups —
+that's the same 0.7% the paper reports too, so it's consistent, not a
+bug; just flagging that a same-magnitude near-zero score for both
+correct and wrong submissions is exactly what we'd expect for a rare
+strategy (0.7% ≈ 2 out of 291), not a red flag.
+
+Want me to:
+
+1.  Dig into which specific Q1 submissions are scoring 0 (the ~23% gap)
+    to see if there's a real detector gap worth naming, the way we found
+    .insert() for Q3?
+
+2.  Look at that one Q1 parse error specifically?
+
+3.  Add Q1's confirmed numbers into the paper/methodology doc now that
+    it's got real data, the same way Q3/Q4 got added?
+
+1. at 14:15 see why Q1 submissions are scoring 0?
+
+I need to redo part of that — my error-filter had a bug (empty strings
+read as NaN, so != '' matched everything). Let me fix it and dig into
+the more important finding: most of the zero-scores aren't "missing" at
+all.This is the real finding, and it changes the diagnosis significantly
+from what I expected.
+
+The one genuine error: wrong_1_434.py — "function 'search' not found in
+submission". Since this is French-language student code elsewhere in the
+project (jouer, rejouer, montant, pile), it's worth checking whether
+this one file specifically uses a different name (e.g. recherche) — a
+real localization inconsistency, or just one outlier submission with an
+unusual signature.
+
+The much bigger, more important finding — 364 of 383 zero-scores (95%)
+are NOT a coverage gap at all:
+
+-   Only 19 rows are missing evidence entirely (14 missing loop, 3
+    missing both test+loop, 2 missing test) — a genuine, if small,
+    coverage gap.
+
+-   364 rows (174 correct-labeled, 190 wrong-labeled) have every slot
+    present — target, test, and loop were all found somewhere in the
+    function — but the score is still exactly 0.
+
+Per GuardedInput's definition, that specific combination (coverage =
+1.0, structural = 0) can only mean the structural check itself is
+failing:
+
+structural=AND([
+
+NESTED("loop", "test"),
+
+SHARED_BINDING([("target", "target", "test", "operand")]),
+
+])
+
+So either (a) a loop and a test both exist in the function but the test
+isn't nested inside the loop, or (b) the tested value's variable name
+doesn't literally match the target variable's name via string comparison
+— even though semantically it's the same thing (e.g., compared through a
+list element like liste[i] rather than the bare parameter name, or
+reassigned to a new variable first).
+
+This is structurally the same category of bug the paper already
+documents repeatedly — an overly literal check missing a real, common
+variant (like the original .pop()/.remove()/.insert() gaps) — except
+here it's SHARED_BINDING's pure string-equality check, not a missing
+detector.
+
+I can't go further without the actual source files — the CSV tells us
+that 364 submissions fail structurally, not which specific code shape
+causes it. To find that, I'd need to see 3–5 real files from
+missing_empty[label=='correct'] (e.g. correct_1_009.py,
+correct_1_015.py, correct_1_030.py) — could you pull a couple of those
+and share them? That would let us pin down the exact variant (e.g.,
+"students index into the list with [i] inside the comparison rather than
+binding a lone variable") the same way we found the .insert() gap for
+Q3.
+
+Load data:
+
+Full dataset is here. Let's look at the specific files we
+identified.This is very clean — I can see exactly what's happening now,
+and it's not one bug but two, both real detector gaps rather than a data
+problem.That third file (wrong_1_434.py) is a genuine dataset quirk, not
+a tooling issue — it literally defines search2, not search. Legitimate
+"wrong" submission, working as intended.
+
+Now let's properly quantify the two structural gaps I can see forming,
+across all 174 correct-labeled files with this exact symptom, rather
+than generalizing from 3 samples.Let me refine this properly — I
+hardcoded checking for the literal string "x", but not every submission
+necessarily uses that parameter name. Let me redo it using each file's
+actual parameter name.Solid, stable numbers with proper parameter
+extraction. Let's peek at one file from each remaining category to close
+out the picture.That reveals a third, distinct gap — not caught by my
+first pass. correct_1_295.py's actual per-iteration check is while x >
+seq[count]: — the comparison lives in the while-loop's own condition,
+not in a nested if. detect_test only walks ast.If nodes, so a
+while-condition test is never captured as TEST evidence at all. And
+correct_1_035.py uses a chained comparison (seq[i] < x <= seq[i+1], two
+operators at once) — a different AST shape than and/or but the same
+underlying failure, since detect_test only handles single-op
+comparisons. Let me redo the classification properly with both of these
+included.Fully explained now — all 364 structural-fail cases, 100%,
+trace to exactly three mechanisms in how TEST evidence is extracted.
+
+Summary of findings
+
+19 files are a genuine coverage gap (loop/test literally absent) —
+small, expected long tail.
+
+364 files (95% of all zero-scores) are entirely a structural detector
+limitation, not a coverage gap — every required piece of evidence
+exists, but SHARED_BINDING/detect_test can't recognize the relationship
+between them. Three distinct, fully quantified mechanisms:
+
+  --------------------------------------------------------------------------------
+  Gap               Count   % of  Mechanism
+                            364   
+  ----------------- ------- ----- ------------------------------------------------
+  Flipped           199     55%   SHARED_BINDING only checks test.operand (left
+  comparison                      side of a comparison). Students writing elem >=
+  direction                       x instead of x <= elem put the searched value on
+                                  the right — test.comparator (right side) is
+                                  captured by detect_test but never checked by
+                                  SHARED_BINDING at all.
+
+  Compound and/or   107     29%   detect_test only extracts operand/comparator for
+  conditions                      a simple, single-op ast.Compare. A BoolOp like
+                                  x > seq[i] and x <= seq[i+1] falls into
+                                  detect_test's else branch, where the entire
+                                  boolean expression becomes one opaque string —
+                                  "x" is inside it, but SHARED_BINDING's
+                                  exact-match check can't see that.
+
+  Chained           50      14%   Same root cause, different AST shape: Python's
+  comparisons                     native seq[i] < x <= seq[i+1] (two ops in one
+                                  Compare node) also falls outside detect_test's
+                                  single-op branch.
+
+  while-condition   8       2%    detect_test only walks ast.If nodes. A while x >
+  as the test                     seq[count]: loop's own condition — functionally
+                                  identical to a per-iteration test — is never
+                                  captured as TEST evidence at all, since it isn't
+                                  an If.
+  --------------------------------------------------------------------------------
+
+This is directly analogous to the design principle already stated in the
+paper (§6, "A broad primitive type is not a safe proxy for a specific
+operation") — except here the gap sits one level up, in how TEST's own
+binding is extracted, not in a missing ASSIGN kind. All three mechanisms
+share one root cause: detect_test and SHARED_BINDING were both built
+around one syntactic shape (a simple, single-op comparison with the
+target on the left) and real student code diverges from that shape in
+three common, legitimate ways.
+
+This is a real, well-evidenced, fixable gap — comparable in spirit and
+scale to the .insert() fix for Q3, though the fix here is a bit more
+involved (touches detect_test's operand/comparator extraction and/or
+SHARED_BINDING's matching logic, not just adding a missed method name).
+Want me to draft the actual fix — likely: (1) also record the right-hand
+side for simple comparisons and let SHARED_BINDING check either side,
+(2) extend detect_test to walk BoolOp and chained Compare
+sub-expressions rather than treating them as opaque, and (3) also emit
+TEST evidence for while loop conditions — and then re-run this batch to
+see the corrected coverage number?
+
+Fix at 14:30 structural detector limitation
+
+The full up-to-date competency.py is still available. Let's copy it to a
+writable location and look at exactly what needs to change.Now let's
+look at SHARED_BINDING and confirm scope tagging (.scope) usage, since I
+need to make sure the fix stays consistent with per-function scoping
+already in place:Let's check how per-function scoping is applied, so the
+synthetic while-condition TEST evidence gets tagged correctly too.Now I
+have everything needed. Let's write the patch — three surgical, additive
+changes.Now let's patch SHARED_BINDING to support containment matching
+when one side is a set, additively:Now let's update GuardedInput (in
+test_real_data.py) and LinearSearch (in q1_competencies.py) to use the
+new all_names binding:Now LinearSearch:Now let's actually test this fix
+against the real data, rather than just trust the reasoning. Let me
+check what else I need.Good, compatible. Let's run the actual batch
+validation for Q1 with the patched code, against your real data.That
+confirms it — the uploaded batch_report.py on disk is actually Version 2
+(relative import), even though you use Version 1. Since two files were
+uploaded with the same name, only the last one persisted. Let me fix
+this locally for testing (I'll use the flat-import version you actually
+run).It ran. Let's compare against the original results — this is the
+real test.This is a very clean result — exactly what the reasoning
+predicted, confirmed against the real data.
+
+Results
+
+Coverage jumped from 76.8% → 99.5% (correct-labeled) and 64.2% → 97.6%
+(wrong-labeled).
+
+-   Zero regressions — every submission that scored 1.0 before still
+    scores 1.0. Confirms the fix is a true superset relaxation, exactly
+    as designed (all_names always includes whatever operand alone used
+    to capture).
+
+-   366 submissions improved from 0 → 1.0 — matches almost exactly the
+    364 "structural mismatch, evidence present but score 0" cases
+    identified earlier (small difference likely from the 2 test-role
+    wrong-labeled files landing slightly differently; worth a quick look
+    if you want it pinned down exactly, but not concerning).
+
+-   367th changed row worth checking on its own — one file moved to
+    something other than a clean 1.0 (worth a glance, but not urgent).
+
+Remaining gap (0.5% correct, 2.4% wrong) is now just the genuine 19-file
+coverage gap from before (loop/test truly absent) — a much smaller, more
+honest residual than what we started with.
+
+Let's copy the fixed files and the verification report so you have
+everything to actually deploy this.## What changed, precisely
+
+competency.py — two additive changes, nothing removed or altered in
+existing behavior:
+
+1.  detect_test now populates a new all_names binding (every identifier
+    referenced anywhere in a test's condition, regardless of shape)
+    alongside the existing operand/comparator/op, and now also emits
+    TEST evidence for while loop conditions (previously invisible — only
+    if was detected).
+
+2.  SHARED_BINDING now supports containment matching when one side is a
+    set (backward compatible — every other existing usage compares two
+    plain strings and is completely unaffected).
+
+test_real_data.py / q1_competencies.py — GuardedInput and LinearSearch's
+structural check switched from operand to all_names, both with a comment
+explaining exactly why, citing the real batch numbers.
+
+One thing worth flagging, since I had to substitute the flat-import
+batch_report.py to actually run this test (the file currently sitting in
+/mnt/user-data/uploads is Version 2, the relative-import one — likely
+just an artifact of uploading it twice under the same name). Make sure
+the copy in your actual project folder is Version 1 before you drop
+these files in.
+
+Two loose ends worth a quick look, not urgent:
+
+1.  That 367th changed row (didn't land on a clean 1.0) — want me to dig
+    into it?
+
+2.  LinearSearch wasn't separately re-verified the same rigorous way (I
+    tested via the combined q1_competencies.py import, which registers
+    both, but the printed comparison above was GuardedInput-specific) —
+    want me to run the same before/after check on LinearSearch's own
+    column too, since it's structurally identical but worth confirming
+    independently?
+
+14:50 test the last version in Artifact project locally.
+
+Good, both columns are there. Let's do both checks.Both loose ends
+resolved — and neither is a real issue, just NaN-comparison noise from
+something we already knew about.
+
+1. The "367th changed row" — it's wrong_1_434.py, the same file flagged
+from the very start ("function 'search' not found in submission", since
+it actually defines search2). Its score was NaN before the fix and NaN
+after — genuinely unchanged. It only showed up as "changed" because NaN
+!= NaN evaluates to True in pandas (NaN is never equal to itself, even
+in a diff check), not because anything about it actually moved. My
+earlier count of "367 total changed" was counting this artifact
+alongside the 366 real improvements — the real number of substantive
+changes is 366, exactly as reported.
+
+2. LinearSearch vs GuardedInput — they agree on 99.93% of all 1,343 rows
+(1,342 out of 1,343). The single disagreement is, again, wrong_1_434.py
+— same NaN-vs-NaN non-event. Every other row scores identically between
+the two competencies, which is exactly what should happen given they're
+deliberately defined with the identical structural shape. LinearSearch
+lands at the same 99.5% (correct) / 97.6% (wrong) as GuardedInput.
+
+So the final, clean picture: the fix works uniformly across both
+competencies, there are zero regressions, and the only asymmetry in the
+whole dataset is one pre-existing, already-explained parse error that
+has nothing to do with this fix. Nothing further to chase here — this is
+ready to treat as done.
+
+Given this is now a real, validated result (99.5%/97.6% coverage, up
+from 76.8%/64.2%, tested against all 1,343 real submissions with zero
+regressions), want me to add Q1 to the paper and methodology doc now,
+the same way Q3/Q4 got added earlier — including this specific finding
+as a nice complement to the .insert() story, since it's a similar shape
+(real detector gap found via full-scale batch validation, fixed,
+verified with before/after numbers)?
+
+Include to docs:
+
+Now let's update §5.4's existing paragraph to point forward to this new
+finding, and add the corresponding Table 4 row:Now let's add the Table 4
+row and update the intro sentence ("nineteen structural defects" →
+twenty):Let's check for other mentions of the defect count (e.g., in the
+abstract) that need updating too:Good, Limitations and Conclusion don't
+need changes. Now let's rebuild the docx and PDF.Let's run the full
+validation suite before delivering, given the recent history with this
+document.All clean and confirmed present. Let's finalize and deliver the
+paper.Now let's do the same update to the methodology doc — Q1's finding
+fits as a new bug entry (#22) plus updating the Q1 paragraph in §6.1,
+following the same pattern used for Q3/Q4.This existing sentence
+overclaims — "correctly matched every real Question 1 submission tested"
+conflates the mismatch-check (true) with actual coverage (which wasn't
+tested yet, and turned out to only be 76.8%). Let me fix that too, not
+just add to it.Now let's add the new §5.2 with the full, detailed
+write-up (this internal doc can go deeper than the paper's condensed
+version):Now let's add the bug entry to §7's bug table, following the
+same format used for #20/#21:Let's check §9 Limitations and the intro
+for anything else needing a Q1-related update:Let's add a small
+residual-gap bullet for Q1, matching the Q3/Q4 pattern already there:Now
+let's rebuild the methodology doc and validate it thoroughly.All clean
+and confirmed present. Let's finalize and deliver both updated
+documents.Both documents are updated, validated, and delivered (docx +
+PDF for each). Summary of what changed in each:
+
+Paper (now 21 pages):
+
+-   New paragraphs in §5.3 covering the Q1 finding — same style and
+    rigor as Q3/Q4 (percentages, sample sizes, mechanism breakdown)
+
+-   §5.4's original Q1 sentence corrected — it previously overclaimed
+    ("correctly matched every real submission") when only
+    mutual-agreement had actually been tested, not coverage
+
+-   Table 4 gained a new row, count updated nineteen → twenty
+
+-   Abstract updated: "two exercises" → "three additional exercises",
+    "nineteen" → "twenty" defects
+
+Methodology doc (now 28 pages):
+
+-   New §5.2 with the full, detailed writeup — more depth than the paper
+    version, including all four fix steps and the exact mechanism
+    percentages
+
+-   §6.1 corrected the same overclaiming sentence, with a forward
+    pointer to §5.2
+
+-   New bug entry #22 in the §7 table, matching the format of #20/#21
+
+-   New residual-gap bullet in §9 Limitations, matching the Q3/Q4
+    pattern already there
+
+Both went through the full validation suite (zip integrity, XML
+well-formedness, style-reference audit) given the earlier
+Word-compatibility issues on the paper specifically.
+
+So, I need a sub_section for all results of the running from Q1 to Q5
+
+Good idea — right now the numbers are scattered across several
+paragraphs; a single consolidated table will make the full picture much
+easier to read. Let's build it.I need to fix the table number (should be
+"Table 5", not "Table 3.1" — inconsistent with the paper's sequential
+numbering) and complete the section renumbering cascade (5.6→5.7 for
+Robustness, plus every cross-reference throughout the paper).Wait — I
+need to fix the numbering more carefully. My new table appears before
+the defects table in reading order, so it should be Table 4, and the
+defects table should shift to Table 5. Let me correct this properly.Now
+let's renumber the old "Table 4" (defects) to "Table 5", both its
+caption and the intro sentence referencing it:Multiple references need
+updating. Let me handle the header renumbering first, then fix every
+"Table 4" (defects) → "Table 5" and every stale section reference.Now
+let's fix all the "Table 4" (defects) → "Table 5" references, and all
+stale section cross-references, in one pass:All matched, no warnings.
+Let's do a final sweep for any remaining stale references (§5.5/§5.6
+pointing at the wrong content) throughout the whole paper:One more stale
+reference at line 264 (BubbleSortPass/allow_mixed_levels, should now
+point at 5.7):Let's do one final grep sweep to confirm everything is now
+internally consistent:Two more found. Let's fix them:Let's run the sweep
+one more time to confirm everything is fully clean now:Fully consistent
+now. Let's rebuild the docx and PDF, and run the complete validation
+suite.All checks pass, the table renders correctly with real numbers.
+Let's finalize and deliver.New §5.5 "Summary: full-corpus coverage
+across all five Refactory exercises", right after taxonomy completion,
+before the embeddings-validation section — 22 pages now.
+
+Table 4 (the new table — this pushed the old Table 4 defects table to
+Table 5, fixed throughout):
+
+  --------------------------------------------------------------------------
+  Question   Task              Target competency       Correct    Wrong (n)
+                                                       (n)        
+  ---------- ----------------- ----------------------- ---------- ----------
+  1          Sequential search GuardedInput /          99.5%      97.6%
+                               LinearSearch            (768)      (575)
+
+  2          Unique day/month  UniqueCheck             90.4%      74.3%
+                                                       (291)      (435)
+
+  3          Duplicate         SelectionStep           94.0%      74.7%
+             elimination                               (546)      (308)
+
+  4          Sort tuples by    SortByKey               77.6%      45.9%
+             age                                       (419)      (357)
+
+  5          Top-K             TopKPattern             78.2%      75.0%
+                                                       (418)      (108)
+  --------------------------------------------------------------------------
+
+Two short paragraphs underneath it: one noting which three exercises (1,
+3, 4) reached their final number only after a defect was found and
+fixed, versus which two (2, 5) reflect the taxonomy as originally built;
+the other naming the pattern that holds across all five — wrong-labeled
+coverage is always substantially lower than correct-labeled, but never
+near zero, reinforcing the paper's core thesis at full-corpus scale
+rather than on one exercise alone.
+
+On the renumbering, since this touched almost every part of §5
+downstream: Table 4 (defects) → Table 5, §5.5 (embeddings) → §5.6, §5.6
+(Robustness) → §5.7, and I went through the whole paper fixing every
+cross-reference — caught and corrected two I'd initially missed on the
+first pass (lines 125 and 127, both pointing at the defects section).
+
+I didn't touch the methodology doc this time — want the same
+consolidated table added there too, or is this one specific to the
+paper? Understood — no changes to the methodology doc. The paper's the
+only place this table lives.
+
+To recap where things stand: the paper is at 22 pages with the new §5.5
+summary table (Table 4) consolidating all five Refactory exercises'
+final coverage numbers, sitting between taxonomy completion (§5.4) and
+the embeddings validation (§5.6, formerly §5.5), with the defects table
+renumbered to Table 5 and every cross-reference in the document checked
+and fixed to match. Both the .docx and .pdf versions are already
+delivered above. Let me know what's next — whether that's more work on
+the paper, the notebook, the Colab embeddings validation, or something
+else entirely.

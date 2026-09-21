@@ -1,0 +1,134 @@
+Let's build this properly and actually test the core mechanism — the AST
+canonicalization/deduplication — since that's the part most likely to
+have subtle bugs. Good — I already have a solid draft from earlier in
+this session that I don't want to overwrite blindly (it's more careful
+about not fabricating corpus paths than my new draft was). Let me verify
+it, test its core logic, and check whether validate_semantic_backup.py
+already supports the --registry-file flag it references. The docstring
+promises a --registry-file flag that doesn't exist yet in
+validate_semantic_backup.py. Let me check the current state and add it
+:Confirmed — mine_exemplars.py documents a --registry-file flag (and
+writes JSON), but validate_semantic_backup.py doesn't support it yet.
+Let me add it so the two scripts actually connect: Need to add the json
+import: Now let's verify it parses and that the default (unmodified)
+behavior still works exactly as before: Identical to before — good, the
+refactor didn't change default behavior. Now let's actually test
+mine_exemplars.py's core mining logic end-to-end with a small synthetic
+stand-in corpus, since I can't reach the real Refactory data
+here:Interesting — this surfaced something worth checking immediately:
+only sub_003.py (the more convoluted variant) scored a clean 1.0, not
+sub_001.py, even though sub_001.py is structurally identical to the
+exemplar already sitting in semantic_backup.py's hand-written registry.
+Let me check that directly:That's a real problem — both hand-written
+GuardedInput exemplars score 0.0 under the actual structural resolver,
+not the 1.0 I assumed. Let me check whether this is isolated or systemic
+across the whole registry, since it would undermine every
+GuardedInput-related conclusion in the findings doc if the exemplars
+were never authentic examples of the competency to begin with:I need to
+stop and flag this clearly before going further — this is a real bug,
+not a minor detail, and it was caught specifically because building the
+mining script forced me to run every exemplar through the actual
+structural resolver, something the hand-written registry never went
+through.
+
+Both GuardedInput exemplars in the registry score 0.0 under your own
+structural rules. I wrote them from memory as "an obviously
+guarded-input shape" and never actually checked them against
+model.resolve(). Let's find out why, and fix it properly:Confirmed: no
+TEST primitive at all — because there's no if statement, only a bare
+while condition. GuardedInput's structural rule requires an explicit if
+nested inside the loop; the while condition itself doesn't count as TEST
+evidence. Let's write a corrected exemplar and verify it actually scores
+1.0:Both score cleanly. Let's also add a second, differently-shaped
+exemplar for diversity, then replace the broken pair in the registry:Now
+let's fix the registry:Now let's re-run the full audit to confirm
+everything checkable is now clean, and re-run lexical validation to see
+the corrected picture:This confirms GuardedInput is now clean;
+AccumulateThenCount remains unverifiable from this sandbox since its
+model lives in q2_competencies.py → pw01_competencies.py, which I don't
+have. I need to flag that honestly rather than assume it's fine. Let me
+add a permanent audit utility so this class of bug can't silently recur,
+then re-run validation with the fix:Now let's test the audit utility
+itself, and confirm the full parse + integration still works:Works
+correctly — flags exactly what's actually uncertain, nothing more. Now
+let's re-run the lexical validation with the corrected GuardedInput
+exemplars: The win rate stayed the same numerically (86.7%) — expected,
+since lexical only sees token overlap and both old/new GuardedInput
+snippets share similar vocabulary (loop, input(), reassignment). But
+that's exactly the point: the bug was invisible to a token-overlap
+metric while being a real correctness problem. It matters far more for
+codet5p, which we can't re-check here. Let's confirm the report.py
+integration and rebuild the notebook with the fix: Good. Now let's
+rebuild the notebook with everything — the fixed semantic_backup.py,
+updated validate_semantic_backup.py with --registry-file support, and
+add mine_exemplars.py as a new step:Let's insert a registry self-check
+cell right after writing the module, before the expensive codet5p
+download:Confirmed the break — line 92 is now orphaned, missing its
+cells.append(nbf.v4.new_markdown_cell(\n"## 4. ... opener. Let me fix
+it:Now let's verify the script itself is syntactically valid before
+running it:Good catch needed there. Now let's rebuild and validate the
+whole notebook end-to-end:Good — both are expected: !pip install and
+!python ... are Colab/IPython shell-magic syntax, not valid plain
+Python, so ast.parse correctly flags them but they're fine as notebook
+cells. Let's check the final cell count/order makes sense:Clean, correct
+order. Let's ship the corrected semantic_backup.py, updated
+validate_semantic_backup.py, the new mine_exemplars.py, and the rebuilt
+notebook:## Important: I found a real bug while building this, not just
+the mining script
+
+Testing the mining logic against a small synthetic corpus (since I don't
+have your real Refactory data here) forced every exemplar through the
+actual structural resolver as ground truth. That surfaced something that
+should have been caught much earlier: both hand-written GuardedInput
+exemplars in the registry scored final_score=0.0 — they were never real
+examples of the competency they claimed to represent. The idiomatic
+while n <= 0: n = input(...) shape has no explicit if, and
+GuardedInput's rule requires a TEST (an if) nested inside the loop — the
+bare while condition doesn't count as evidence. I wrote these from
+memory and never actually checked them.
+
+Fixed and re-verified: both exemplars now confirmed final_score=1.00. I
+also audited the entire registry the same way — everything else checks
+out, except AccumulateThenCount, which I genuinely can't verify here
+since its competency is registered in
+q2_competencies.py/pw01_competencies.py, neither of which I have access
+to. I'm flagging that as unverified rather than assuming it's fine.
+
+What this means for the findings doc: the lexical numbers barely moved
+(86.7% unchanged — lexical only sees token overlap, and both old/new
+snippets share similar vocabulary), but that's exactly the problem: the
+structural invalidity was invisible to that metric while being a real
+correctness issue. Every GuardedInput-involving conclusion about codet5p
+in the findings doc now carries an asterisk, since we can't know how a
+contrastive model would embed structurally-wrong code differently —
+untestable from this sandbox.
+
+What I delivered
+
+mine_exemplars.py — mines exemplars from real submissions instead of
+hand-writing them, using the structural resolver (final_score >= 1.0) as
+the selection criterion — never embeddings, to avoid circularity — and
+deduplicates near-identical submissions via AST-level canonical keys
+(alpha-renaming variables/params/function names, so two solutions
+differing only in naming collapse to one representative). It's honest
+about its own limits: several competencies (Accumulation,
+AccumulateThenCount) are left as flagged TODOs rather than guessed at,
+since I don't have confirmation of which real corpus folder they'd come
+from.
+
+semantic_backup.py — the GuardedInput fix, plus a new audit_registry()
+function so this exact bug class can't silently ship again.
+
+validate_semantic_backup.py — now supports --registry-file (loading
+mined exemplars) and --compare-registries (hand-written vs. mined, side
+by side), matching the workflow the docstring already promised.
+
+Notebook: added step 3b — runs audit_registry() right after writing the
+module, before spending time on the codet5p download, so a broken
+exemplar gets caught early.
+
+Next step in Colab: re-run from Cell 3 onward (the audit cell will
+confirm the fix), then Cell 4 to get corrected codet5p numbers for
+GuardedInput specifically. Actually mining from real data requires the
+Refactory corpus present in that Colab session, which it doesn't sound
+like you have loaded there yet.

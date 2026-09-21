@@ -1,0 +1,177 @@
+Steps for semantic Backup (second role) 08-08-2026
+
+Question 1: I want a Colab notebook, to close this gap: get real
+embeddings running, build a real exemplar registry from actual Refactory
+solutions, and test — honestly — whether real code-similarity embeddings
+separate genuinely-novel-correct submissions from genuinely-wrong ones.
+
+Response:
+
+Good — this is genuinely the missing piece: everything so far (taxonomy
+cross-validation for Q4/Q5) tested whether embeddings agree with an
+existing AST split.
+
+This notebook tests the layer's actual job: separating novel-but-correct
+code from genuinely-wrong code. Let me build it, folding in everything
+we've learned — the codet5p-110m-embedding fix, the
+real-exemplar-registry lesson, and the contaminated-comparison-group
+lesson from the very first attempt at this. Let's validate the notebook
+structure before delivering.Well-formed, 22 cells, clean structure.
+Let's deliver it. Structure:
+
+1.  §1–4: familiar setup/Drive-mount/codet5p-110m-embedding pattern
+
+2.  §5: builds the two real groups — novel_correct (test-suite-correct,
+    scored 0 structurally) and genuinely_wrong (all wrong-labeled,
+    deliberately not filtered — that filter is exactly what contaminated
+    the very first attempt at this months ago in this conversation)
+
+3.  §7: this is the core addition beyond what's been tried before —
+    rather than one exemplar registry, it bootstraps: draws a fresh set
+    of N_EXEMPLARS real correct submissions 10 different times
+    (excluding the pool from novel_correct itself, so nothing tests
+    against its own kind), and reports AUC as a mean ± SD across draws,
+    not a single number
+
+4.  §8: three honest outcomes spelled out explicitly before you see the
+    number — good/stable, near-chance, or unstable — so you're primed to
+    read whichever result actually comes out correctly rather than
+    reaching for the most flattering interpretation
+
+5.  §9: threshold calibration, but with an explicit caveat that it's
+    only meaningful if §8's AUC was actually good
+
+Defaults to FindExtremum/Q5, since that's the competency with an
+already-confirmed 43-submission novel_correct population — the
+healthiest sample size available for this specific test. Section 3 is
+the one cell to edit if you want to run this against a different
+competency instead (Q4's SortByKey, for instance, given its 22.4%
+unmatched group is comparably sized).
+
+One thing worth expecting going in: given everything we've seen so far —
+Q2's functional split collapsing under a small sample, novel's unstable
+recall in the taxonomy check — I'd genuinely go into this one without a
+strong prior on which of the three §8 outcomes is most likely. That's
+kind of the point of building it this carefully.
+
+Result of cell 13
+
+Good catch bringing this to me rather than just reading "0.098 ≈ low
+number, done" — because this result is genuinely interesting, and it's
+easy to misread at first glance.
+
+First, the important correction: this is NOT "no separation." Look at
+the scale — AUC=0.5 means no separation (chance). AUC=0.098 is nowhere
+near 0.5; it's close to 0, at the opposite end of the scale from 1.0. An
+AUC near 0 means the model separates the two groups very well — just in
+the reverse direction from what the layer is designed to assume.
+
+Look at what's actually happening in your own columns, consistently
+across all 10 runs:
+
+  -----------------------------------------------------------------------
+                novel_correct mean          genuinely_wrong mean
+                similarity                  similarity
+  ------------- --------------------------- -----------------------------
+  Every single  ~0.79–0.81                  ~0.94–0.96
+  run                                       
+
+  -----------------------------------------------------------------------
+
+Genuinely-wrong submissions are systematically more similar to the
+correct exemplars than the novel-correct submissions are. And this isn't
+noise — std=0.039 on the AUC across 10 different exemplar draws is
+tight, meaning this reversal shows up no matter which 8 exemplars get
+picked. This is a real, stable, strongly-reversed finding, not an
+inconclusive one.
+
+Why this makes sense, once you think about it — and this connects
+directly to something the paper already established (§5.1): most
+wrong-labeled submissions in this dataset aren't wrong because they
+attempted something different — they correctly implement the standard,
+typical pattern and fail on an unrelated edge case. That means they
+look, syntactically, very close to a "textbook" correct exemplar.
+Meanwhile novel_correct submissions are, by definition, doing something
+atypical — that's the entire reason the AST rules didn't recognize them.
+So of course they read as less similar to a registry built from typical
+correct examples — their whole defining trait is that they don't look
+typical, even though they behave correctly.
+
+What this means for the layer's actual design, stated in Section 7: the
+core assumption — "a high similarity score means this looks like it's
+doing the same thing as a correct reference solution" — doesn't hold
+here. As built, high similarity-to-exemplar is actually a better signal
+for "attempted the standard approach" (which correlates with the typical
+near-miss wrong submissions) than for "is correct." If you deployed this
+exact mechanism as-is, it would tend to flag the wrong population for
+review.
+
+This is a genuinely more valuable result than a null one — it's not "the
+layer doesn't work," it's "the layer's specific decision rule (raw
+max-similarity-to-correct-exemplars) is measuring something other than
+what it needs to." A concrete next step worth trying: instead of
+similarity-to-correct-exemplars alone, build a second registry from
+typical wrong submissions and use the difference (or ratio) between
+similarity-to-correct and similarity-to-wrong as the signal, rather than
+similarity-to-correct in isolation — that could plausibly separate
+"close to correct, but also close to typical-wrong" (ambiguous) from
+"close to correct, and not close to typical-wrong" (a better candidate
+for genuine novel-correct).
+
+Want me to add a Section 11 to the notebook trying that two-registry
+approach, or write up this inverted-AUC finding as-is first, since it's
+already a solid, honest result worth having on record either way?
+
+here is the result of cell 15 Pooled AUC across all 10 runs (1510 scored
+pairs): 0.097 Suggested threshold for ~80% recall on novel-correct:
+0.719 (false-positive rate at this point: 0.997)
+
+This confirms everything from Cell 13 at full scale, and makes it
+concrete in the way that actually matters for deployment — the practical
+uselessness of the naive threshold.
+
+Pooled AUC = 0.097, matching the bootstrapped mean (0.098) almost
+exactly. This isn't a fluke of small-sample bootstrapping — it holds
+across all 1,510 scored pairs pooled together. The reversal is real and
+stable at scale.
+
+The threshold result is the more damning number, in practical terms: to
+catch 80% of novel_correct submissions, the required threshold (0.719)
+also flags 99.7% of genuinely_wrong submissions. In other words: to
+catch most of what you actually want to catch, you'd have to flag almost
+the entire wrong-labeled population too — which is exactly what the
+reversed AUC predicts (since wrong's scores cluster around 0.95, any
+threshold low enough to catch most of novel_correct's ~0.80 cluster sits
+so far below wrong's distribution that nearly all of it gets swept in
+too).
+
+What this means concretely: deployed as designed, this mechanism
+wouldn't function as a useful filter at all. A human using it to decide
+which submissions deserve a second look would be told to review
+essentially everyone — no better, and probably worse in practice, than
+no filter at all. This is a clean, quantified confirmation that the
+layer's core assumption (similarity-to-correct-exemplars ⇒ likely
+correct) fails here, not marginally, but in a way that inverts the
+intended signal.
+
+This is a strong, deployment-relevant negative result — worth reporting
+exactly as found, not softened. Given how clean and consistent it is
+(tight std, confirmed at both the per-run and pooled level), I think
+it's solid enough to write up as the actual finding for the companion
+paper, rather than something to keep iterating on blindly.
+
+Two paths from here — your call:
+
+1.  Try the two-registry idea from last message (similarity-to-correct
+    minus similarity-to-typical-wrong, rather than similarity-to-correct
+    alone) — a genuine next experiment, not guaranteed to work, but
+    worth one honest attempt before concluding.
+
+2.  Stop here and write this up as the finding — "raw
+    max-similarity-to-correct-exemplars is not merely uninformative but
+    actively inverted for this task" is already a complete,
+    well-evidenced, honest result on its own, and forcing a fix into the
+    same session risks chasing a positive result rather than reporting
+    what you actually found.
+
+Which do you want to do?

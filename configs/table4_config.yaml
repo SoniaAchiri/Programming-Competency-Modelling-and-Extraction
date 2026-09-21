@@ -1,0 +1,23 @@
+# Row order and stage_manifest.yaml stage-id lookup for Table 4.
+table: "Table 4 — Final target-competency coverage, all five Refactory exercises, function-scoped"
+rows:
+  - question: 1
+    task: "Sequential search"
+    target_competency: "GuardedInput / LinearSearch"
+    stage_id: q1_final
+  - question: 2
+    task: "Unique day/month"
+    target_competency: "UniqueCheck"
+    stage_id: q2_final
+  - question: 3
+    task: "Duplicate elimination"
+    target_competency: "SelectionStep"
+    stage_id: q3_final
+  - question: 4
+    task: "Sort tuples by age"
+    target_competency: "SortByKey"
+    stage_id: q4_final
+  - question: 5
+    task: "Top-K"
+    target_competency: "TopKPatternExtended"
+    stage_id: q5_final_extended

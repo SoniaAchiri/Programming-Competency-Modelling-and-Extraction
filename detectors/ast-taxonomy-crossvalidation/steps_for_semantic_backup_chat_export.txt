@@ -1,0 +1,1146 @@
+31/07/2026 (Summarize from Pro in Gey PC)
+
+At 14:50
+
+The Semantic Backup Layer: Role and Relation to the AST-Based Structural
+Model
+
+1. What the structural (AST) layer already does
+
+The core system — the subject of the published paper — extracts
+programming competencies directly from a submission's Abstract Syntax
+Tree. Every competency is defined as an explicit, rule-based pattern
+over primitives (loops, tests, assignments, etc.), scored along two
+independent axes, coverage and structure, multiplied into a final_score.
+This is:
+
+-   Deterministic — the same code always produces the same score
+
+-   Fully inspectable — every match traces back to specific AST nodes
+    and named bindings
+
+-   Validated at real scale — against thousands of real Refactory
+    submissions and an unseen course assignment
+
+Its one structural limitation, named explicitly in the paper's own
+Limitations section: it can only recognize strategies someone has
+written a rule for. A student who solves a problem in a way no one
+anticipated — using a language feature or idiom the rule set doesn't
+cover — will score 0, even if their code is completely correct.
+
+Concrete example already named in the codebase: finding the maximum of a
+list via functools.reduce(lambda a, b: a if a > b else b, lst). This has
+no ast.If, no explicit loop, and no max()/min() call — invisible to both
+branches of FindExtremum = ANY(manual_loop, builtin_reduce), even though
+it's a legitimate, correct implementation of the exact skill that
+competency is trying to detect.
+
+2. What the semantic backup layer is for
+
+The semantic layer exists only to catch this specific failure mode: a
+submission that is very likely correct, but that the rule-based
+structural layer cannot recognize because no one has written a rule for
+its particular strategy yet.
+
+It works by comparing a submission's code embedding (currently via
+Salesforce/codet5p-110m-embedding, a model trained with a contrastive
+objective specifically for code similarity/retrieval) against a small
+registry of known-correct exemplar solutions for a given competency. A
+high similarity score means: this looks like it's doing the same thing
+as a correct reference solution, even though no structural rule matched
+it — a signal that a human should take a second look, not proof of
+correctness.
+
+3. The one design rule that defines the relationship between the two
+layers
+
+Semantic similarity never modifies final_score.
+
+This is stated as a non-negotiable principle in the code itself
+(semantic_backup.py) and is the single most important fact about how the
+two layers relate. Structural evidence remains the sole, inspectable
+basis for the score every competency reports. The semantic layer only
+ever adds a separate, clearly labeled, explicitly "unverified" field —
+reported alongside the structural score, never folded into it — intended
+to flag a submission for manual review, not to auto-credit it.
+
+The reasoning: the structural layer's entire value proposition,
+established and validated across the AST paper, is that every score is
+traceable to a specific, inspectable pattern in the code. Letting an
+embedding-similarity number — which is not inspectable in the same way,
+and which the paper's own early tests showed can fail in non-obvious
+ways (see §5) — silently raise a final_score would undermine exactly the
+property that makes the structural layer trustworthy in the first place.
+Keeping the two strictly separate lets the system gain semantic-layer
+sensitivity without spending any of the structural layer's
+inspectability or reliability to get it.
+
+4. Where each layer sits, concretely
+
+  ----------------------------------------------------------------------------
+                   Structural (AST) layer     Semantic backup layer
+  ---------------- -------------------------- --------------------------------
+  Input            The submission's AST       The submission's raw source
+                                              text, embedded
+
+  Output           final_score (coverage ×    A similarity score to
+                   structure)                 known-correct exemplars
+
+  Basis            Explicit, human-authored   Learned representation from a
+                   rules                      pretrained code-embedding model
+
+  Determinism      Fully deterministic, same  Depends on model/exemplar
+                   code → same score          registry, can shift as either
+                                              changes
+
+  Inspectability   Every match traces to      A similarity number; not a
+                   specific AST nodes         structural explanation
+
+  Role             Primary — the score that   Secondary — a flag for human
+                   counts                     review only
+
+  Validated?       Yes — real scale,          Not yet — this is the open
+                   published results (the AST question this notebook is
+                   paper)                     validating
+  ----------------------------------------------------------------------------
+
+5. Why the semantic layer isn't in the published (AST) paper
+
+Two reasons, both already stated explicitly in that paper's own text:
+
+1.  Scope discipline. The AST paper's contribution and validation claims
+    are about the structural model specifically. Folding in a second,
+    architecturally separate signal — with its own, still-open
+    validation question — would dilute a paper that is otherwise fully
+    validated at real scale.
+
+2.  It genuinely wasn't validated yet at the time. The original
+    development sandbox had no network access to download real
+    codebert-base weights (confirmed via a blocked request, not
+    assumed). The stand-in used to test the surrounding plumbing
+    (registry, caching, thresholding, report integration) was a
+    bag-of-AST-tokens cosine similarity, and it was directly shown to
+    have no discriminative power — a genuinely related reformulation and
+    a completely unrelated function scored within 0.02 of each other.
+
+The current Colab work is precisely the process of closing that gap: get
+real embeddings running, build a real exemplar registry from actual
+Refactory solutions, and test — honestly — whether real code-similarity
+embeddings separate genuinely-novel-correct submissions from
+genuinely-wrong ones.
+
+6. Current state of that validation (in progress)
+
+-   First real-embedding attempt (raw codebert-base, mean-pooled):
+    reproduced the same "no discriminative power" finding as the
+    original stub — related and unrelated code scored ~0.96 either way.
+    Root cause: anisotropy — raw, non-fine-tuned transformer embeddings
+    collapse into a narrow cone in embedding space under mean-pooling, a
+    documented property of BERT-family models used this way,
+    independently reproduced by other users hitting the identical
+    symptom with codebert-base.
+
+-   Switched to codet5p-110m-embedding, a model actually trained with a
+    contrastive objective for code similarity (not just masked-language
+    modeling) — the same fix Sentence-BERT applied to regular BERT. This
+    is now producing a real, non-collapsed gap between related and
+    unrelated code in the sanity check.
+
+-   Building the actual test set that matters: not "everything," but
+    specifically submissions that are test-suite-correct yet scored 0
+    structurally (43 real Q5 candidates found so far) versus a
+    true-negative comparison group.
+
+  The first attempt at a comparison group (same-exercise "wrong"
+  submissions) turned out to be contaminated — per the AST paper's own
+  §5.3 finding, most wrong-labeled submissions still implement the
+  structural pattern correctly and fail elsewhere, so they aren't real
+  negatives for this test. Comparison group is being rebuilt from an
+  unrelated exercise instead, to get an unambiguous negative set.
+
+-   Next step: compute similarity for both groups, run an AUC/ROC sweep
+    to see whether real similarity actually separates them, and
+    calibrate a threshold from that — rather than assuming one. Either
+    outcome (it works, or it doesn't beat chance) is a valid, reportable
+    finding for the companion paper, in the same honest spirit as Table
+    4 of the AST paper.
+
+7. One-sentence summary of the relationship
+
+The AST layer is the system's source of truth; the semantic layer is a
+secondary, explicitly-unverified sensor that watches for cases the
+source of truth is structurally blind to, and its entire validation
+burden is to prove it can do that reliably enough to be worth reporting
+at all — it can never buy its way into affecting a score.
+
+31/07/2026
+
+At 15:50. what if I want to validate the results from The AST part, by
+comparing the submissions (first for Q5), with the pattern of
+competencies by the semantic tool?
+
+Good idea — this gives you an independent check on whether the AST
+taxonomy's categories (e.g., "manual loop" vs. "builtin max()/min()")
+correspond to real distinctions in embedding space, not just a check on
+missed cases. Here's the design, then the code to add.
+
+The idea: Use the structural labels you already have (from
+topk_report.csv) to split Q5 submissions into groups — manual (matched
+via SelectionStep), builtin (matched via FindExtremum but not
+SelectionStep), and novel (matched neither, score 0). Hold out a handful
+of clear examples from manual and builtin as exemplars, embed everything
+else, and classify each remaining submission by nearest exemplar
+centroid — using the embedding model alone, with no knowledge of which
+AST rule matched it.
+
+Two things this tells you:
+
+1.  Confusion matrix on manual/builtin: if semantic similarity agrees
+    with the structural label most of the time, that's real, independent
+    evidence the AST taxonomy is carving reality at a natural joint, not
+    an arbitrary one. Low agreement would be a genuine, interesting
+    finding — worth reporting either way.
+
+2.  Where novel submissions land: do they lean toward manual, toward
+    builtin, or neither? That's informative about what the truly novel
+    strategies actually are — a functools.reduce version might sit
+    closer to manual in embedding space even though it structurally
+    matches neither.
+
+Add these cells at the end of your notebook (they reuse codebert_embed,
+cosine_sim, PROJECT_DIR, and report already defined earlier):
+
+# === Cross-validating the AST taxonomy: does semantic similarity agree
+
+# with the structural strategy labels for Q5? ===
+
+def structural_label(row, threshold=0.99):
+
+if row["SelectionStep_final"] >= threshold:
+
+return "manual"
+
+elif row["FindExtremum_final"] >= threshold:
+
+return "builtin"
+
+elif row["FindExtremum_final"] == 0:
+
+return "novel"
+
+else:
+
+return "partial" # nonzero but doesn't fully match either branch
+
+report["structural_label"] = report.apply(structural_label, axis=1)
+
+print(report["structural_label"].value_counts())
+
+import random, os
+
+import numpy as np
+
+random.seed(0)
+
+FOLDER = f"{PROJECT_DIR}/refactory/data/question_5/code"
+
+def read_src(fname):
+
+for sub in ["correct", "wrong"]:
+
+p = f"{FOLDER}/{sub}/{fname}"
+
+if os.path.exists(p):
+
+return open(p, encoding="utf-8").read()
+
+return None
+
+manual_files = report[report["structural_label"] ==
+"manual"]["file"].tolist()
+
+builtin_files = report[report["structural_label"] ==
+"builtin"]["file"].tolist()
+
+N_EXEMPLARS = 8
+
+manual_exemplar_files = random.sample(manual_files, min(N_EXEMPLARS,
+len(manual_files)))
+
+builtin_exemplar_files = random.sample(builtin_files, min(N_EXEMPLARS,
+len(builtin_files)))
+
+manual_centroid = np.mean([codebert_embed(read_src(f)) for f in
+manual_exemplar_files], axis=0)
+
+builtin_centroid = np.mean([codebert_embed(read_src(f)) for f in
+builtin_exemplar_files], axis=0)
+
+print(f"manual exemplars: {len(manual_exemplar_files)} builtin
+exemplars: {len(builtin_exemplar_files)}")
+
+# Classify every remaining submission by nearest exemplar centroid --
+
+# no knowledge of the structural label used here, only the embedding.
+
+held_out = set(manual_exemplar_files + builtin_exemplar_files)
+
+test_rows = report[~report["file"].isin(held_out)]
+
+rows = []
+
+for _, row in test_rows.iterrows():
+
+src = read_src(row["file"])
+
+if src is None:
+
+continue
+
+emb = codebert_embed(src)
+
+sim_manual = cosine_sim(emb, manual_centroid)
+
+sim_builtin = cosine_sim(emb, builtin_centroid)
+
+rows.append({
+
+"file": row["file"],
+
+"structural_label": row["structural_label"],
+
+"semantic_predicted": "manual" if sim_manual > sim_builtin else
+"builtin",
+
+"sim_manual": sim_manual,
+
+"sim_builtin": sim_builtin,
+
+})
+
+results_df = pd.DataFrame(rows)
+
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+# 1. Agreement on the known manual/builtin split -- does semantic
+similarity
+
+# independently confirm the AST taxonomy's own distinction?
+
+known = results_df[results_df["structural_label"].isin(["manual",
+"builtin"])]
+
+cm = confusion_matrix(known["structural_label"],
+known["semantic_predicted"], labels=["manual", "builtin"])
+
+print("confusion matrix [rows=structural, cols=semantic]:\n", cm)
+
+print("agreement accuracy:", accuracy_score(known["structural_label"],
+known["semantic_predicted"]))
+
+# 2. Where do the *novel* submissions (the semantic layer's actual
+target
+
+# population) land, semantically, relative to the two known strategies?
+
+novel = results_df[results_df["structural_label"] == "novel"]
+
+print("\nnovel submissions' nearest strategy:\n",
+novel["semantic_predicted"].value_counts())
+
+print("\ntop novel candidates closest to a known strategy:")
+
+print(novel.sort_values("sim_manual", ascending=False)[["file",
+"sim_manual", "sim_builtin"]].head(10))
+
+Reading the results once you run it:
+
+-   High agreement (say >85%) on the manual/builtin confusion matrix →
+    strong independent validation of that part of the taxonomy.
+
+-   Low agreement → a genuinely interesting negative finding — it would
+    mean the AST-level "manual vs. builtin" split doesn't correspond to
+    a clean semantic distinction, which is worth a sentence in the
+    companion paper either way.
+
+-   The novel group's sim_manual/sim_builtin numbers, sorted,
+    effectively give you a ranked list of "most likely to be a
+    near-miss/variant of an existing strategy" vs. "genuinely unlike
+    anything else" — useful for deciding which novel submissions to
+    actually go read.
+
+Want me to fold this into a fresh copy of the full .ipynb for you, or
+are you continuing to hand-edit from these snippets?
+
+16:30
+
+Let's change the idea: Use the structural labels I already have (from
+topk_report.csv) to split Q5 submissions (take only the first 70% ) into
+groups — manual (matched via SelectionStep), builtin (matched via
+FindExtremum but not SelectionStep), and novel (matched neither, score
+0). Take the rest of submissions (the 30% in Q5 submissions) , embed
+everything else, and classify each remaining submission by nearest
+exemplar centroid — using the embedding model alone, with no knowledge
+of which AST rule matched it.
+
+Good change — this is a stronger test: instead of small hand-picked
+exemplar sets, you build all three centroids (manual/builtin/novel) from
+a proper 70% training split, then classify the held-out 30% purely by
+embedding distance, blind to the structural label. Here's the
+code.```python
+
+=== Cross-validating the AST taxonomy via a 70/30 split ===
+
+Train (70%): build one centroid per structural label (manual, builtin, novel).
+
+Test (30%): classify by nearest centroid using embeddings alone -- no
+
+knowledge of which AST rule matched -- then compare to the real label.
+
+import os import numpy as np import pandas as pd
+
+def structural_label(row, threshold=0.99): if
+row["SelectionStep_final"] >= threshold: return "manual" elif
+row["FindExtremum_final"] >= threshold: return "builtin" elif
+row["FindExtremum_final"] == 0: return "novel" else: return "partial" #
+nonzero but matches neither branch fully -- excluded below
+
+report["structural_label"] = report.apply(structural_label, axis=1)
+
+Keep only the three clean groups this experiment is about
+
+labeled = report[report["structural_label"].isin(["manual", "builtin",
+"novel"])].reset_index(drop=True)
+print(labeled["structural_label"].value_counts())
+
+split_point = int(len(labeled) * 0.7) train_df =
+labeled.iloc[:split_point] test_df = labeled.iloc[split_point:]
+print(f"\ntrain: {len(train_df)} test: {len(test_df)}")
+print(train_df["structural_label"].value_counts())
+print(test_df["structural_label"].value_counts())
+
+```python
+
+FOLDER = f"{PROJECT_DIR}/refactory/data/question_5/code"
+
+def read_src(fname):
+
+for sub in ["correct", "wrong"]:
+
+p = f"{FOLDER}/{sub}/{fname}"
+
+if os.path.exists(p):
+
+return open(p, encoding="utf-8").read()
+
+return None
+
+# Build one centroid per label from the training 70%
+
+centroids = {}
+
+for label in ["manual", "builtin", "novel"]:
+
+files = train_df[train_df["structural_label"] == label]["file"].tolist()
+
+embeddings = [codebert_embed(read_src(f)) for f in files if read_src(f)
+is not None]
+
+centroids[label] = np.mean(embeddings, axis=0)
+
+print(f"{label}: {len(embeddings)} training submissions embedded")
+
+# Classify the held-out 30% by nearest centroid -- embeddings only,
+
+# structural label used solely for scoring afterward, not for prediction
+
+rows = []
+
+for _, row in test_df.iterrows():
+
+src = read_src(row["file"])
+
+if src is None:
+
+continue
+
+emb = codebert_embed(src)
+
+sims = {label: cosine_sim(emb, c) for label, c in centroids.items()}
+
+predicted = max(sims, key=sims.get)
+
+rows.append({
+
+"file": row["file"],
+
+"structural_label": row["structural_label"],
+
+"semantic_predicted": predicted,
+
+**{f"sim_{k}": v for k, v in sims.items()},
+
+})
+
+results_df = pd.DataFrame(rows)
+
+from sklearn.metrics import confusion_matrix, accuracy_score,
+classification_report
+
+labels_order = ["manual", "builtin", "novel"]
+
+cm = confusion_matrix(results_df["structural_label"],
+results_df["semantic_predicted"], labels=labels_order)
+
+print("confusion matrix [rows=structural label, cols=semantic
+prediction]")
+
+print(pd.DataFrame(cm, index=labels_order, columns=labels_order))
+
+print("\noverall accuracy:",
+accuracy_score(results_df["structural_label"],
+results_df["semantic_predicted"]))
+
+print("\n", classification_report(results_df["structural_label"],
+results_df["semantic_predicted"], labels=labels_order))
+
+A few things worth knowing before you run it:
+
+1.  The novel centroid is a real methodological question here, not just
+    a technical detail. novel isn't one coherent strategy — it's
+    "everything the AST rules didn't recognize," which could span
+    several genuinely different implementations (functools.reduce,
+    sorted()[-1], heapq.nlargest, etc.). Averaging all of them into one
+    centroid may produce a centroid that isn't close to any individual
+    novel submission. If novel's row in the confusion matrix looks bad,
+    that's not necessarily a failure of the embedding model — it may
+    just mean novel needs sub-clustering rather than one label. Worth
+    checking with results_df[results_df["structural_label"]=="novel"]
+    sorted by sim_novel to see how tight/loose that group actually is.
+
+2.  "First 70%" is literal row order from topk_report.csv, not shuffled
+    — if that CSV happens to be sorted alphabetically by filename
+    (likely, since batch_report.py uses sorted(glob.glob(...))), and
+    correct_5_*.py/wrong_5_*.py filenames are numbered sequentially,
+    your train/test split could end up non-random in ways that bias
+    results (e.g., all wrong-labeled files clustering at one end). Want
+    me to add a shuffle (with a fixed seed for reproducibility) before
+    the split, or do you specifically want the literal
+    first-70%-by-file-order split preserved?
+
+3.  Small numeric footnote: novel group size will be your Q5
+    structural-zero count (43, from earlier), so after a 70/30 split
+    it's roughly 30 train / 13 test — thin for a centroid and for
+    reporting a confusion-matrix cell with confidence. Worth keeping in
+    mind when you interpret that row specifically.
+
+Notebook: ast_taxonomy_crossvalidation
+
+Can you give me the previous code into a notebook with all necessary
+parts to run directly in colab?
+
+Let's validate it's well-formed and check the content flows correctly.21
+cells, correctly structured and self-contained. Let's finalize.This is a
+fully standalone notebook — it doesn't depend on the other one being
+open first. Upload it directly into Colab and run top to bottom:
+
+1.  Setup + Drive mount — same PROJECT_DIR convention as before
+
+2.  Embedding model — codet5p-110m-embedding, with the config-patch fix
+    already baked in (no version pin, no tokenizers build issue)
+
+3.  Load topk_report.csv and assign manual/builtin/novel/partial
+    structural labels
+
+4.  70/30 split — literal first-70% as you specified, with a
+    SHUFFLE_BEFORE_SPLIT flag (default False) in case you want to rule
+    out the ordering-bias concern I flagged without changing your
+    original design
+
+5.  Build the three centroids from the training 70%
+
+6.  Classify the test 30% by nearest centroid, blind to structural label
+
+7.  Confusion matrix + accuracy report
+
+8.  A diagnostic cell for the novel group specifically — shows how
+    tight/loose that cluster actually is and which files sit at the
+    edges, useful if that row comes out weak
+
+9.  Saves results back to your Drive folder as a CSV
+
+Run it and send me the confusion matrix + accuracy — I'll help you read
+what it means for both the companion paper and, more subtly, for whether
+the AST taxonomy's manual/builtin distinction is one a completely
+independent signal agrees with.
+
+Until cell4:
+
+That checks out well — let's verify: 327 + 151 + 48 = 526, exactly the
+full Q5 dataset (418 correct + 108 wrong), with partial = 0. That's a
+good sign in itself: it means every Q5 submission matches SelectionStep
+or FindExtremum at essentially 1.0 or exactly 0 — no messy in-between
+cases at the 0.99 threshold, so nothing's silently getting dropped or
+miscategorized.
+
+Also a nice consistency check against earlier work: novel = 48 matches
+exactly what we'd expect from before — 43 novel-correct (from the
+semantic-backup-validation notebook) + 5 novel-wrong (the small group
+from the very first genuinely_wrong filter, before we broadened it) =
+48.
+
+One thing worth watching before you move to cell 5: the classes are
+quite imbalanced — manual is 62% of the data, builtin 29%, novel only
+9%. Two implications:
+
+1.  When you get to the confusion matrix in cell 8, don't judge it by
+    overall accuracy alone — a classifier could get ~62% "accuracy" just
+    by guessing manual every time. Look at the per-class
+    precision/recall in classification_report instead, especially for
+    novel.
+
+2.  Because the split in cell 5 is literal first-70%/last-30% (not
+    shuffled), and novel is a thin slice (48 total, so maybe ~14 end up
+    in the test 30% if evenly distributed) — if the file ordering
+    happens to cluster novel submissions unevenly (e.g., mostly early or
+    mostly late alphabetically), the test set could end up with very few
+    or very many novel examples, which would make that row of the
+    confusion matrix unreliable either way.
+
+When you run cell 5, paste me the train/test label-count output — I want
+to check specifically how many novel examples land in each side before
+we trust the confusion matrix that comes out of cell 8.
+
+That distribution looks fine — no major skew from using the literal
+(unshuffled) split:
+
+  -------------------------------------------------------------------------
+                                     manual      builtin   novel    total
+  ---------------------------------- ----------- --------- -------- -------
+  Train                              230         101       37       368
+
+  Test                               97          50        11       158
+
+  test as % of total per class       30%         33%       23%      30%
+  -------------------------------------------------------------------------
+
+novel train/test came out close enough to the 70/30 target (77%/23%
+rather than exactly 70/30) that the alphabetical-ordering risk I flagged
+doesn't seem to have caused real damage here — you didn't get unlucky.
+Good, no need to flip SHUFFLE_BEFORE_SPLIT unless you want a second run
+to cross-check robustness later.
+
+One number to keep in your head going into cell 8: novel test = 11.
+That's thin enough that each single misclassification swings that row's
+recall by ~9 percentage points — so if novel's accuracy comes out at,
+say, 60% (meaning ~4 misclassified), don't over-read that as a precise
+number. Treat it as "roughly two-thirds, plus or minus one file" rather
+than a stable percentage. manual (97) and builtin (50) are large enough
+to trust more literally.
+
+Go ahead and run cells 6 and 7 (centroid building, then classification),
+then cell 8 for the confusion matrix — paste me that output and we'll
+read it together, especially the novel row and whether cell 9's
+tightness check tells us anything about why.
+
+Result of cell8: confusion matrix [rows=structural label, cols=semantic
+prediction] manual builtin novel manual 83 14 0 builtin 2 48 0 novel 5 1
+5
+
+overall accuracy: 0.8607594936708861
+
+precision recall f1-score support
+
+manual 0.92 0.86 0.89 97
+
+builtin 0.76 0.96 0.85 50
+
+novel 1.00 0.45 0.62 11
+
+accuracy 0.86 158
+
+macro avg 0.89 0.76 0.79 158 weighted avg 0.88 0.86 0.86 158
+
+This is a genuinely good result, and it lines up almost exactly with the
+concern I flagged before you ran it. Let's break it down.
+
+The strong part: manual vs. builtin separation is real and independently
+confirmed
+
+-   builtin recall = 0.96 (48/50) — almost every real builtin-strategy
+    submission gets recognized as builtin by the embedding alone, no
+    knowledge of the AST rule. Makes sense: return max(lst)-style
+    solutions are short, homogeneous, and structurally similar to each
+    other — a tight, easy-to-find cluster.
+
+-   manual precision = 0.92 — when the classifier says "manual," it's
+    right 92% of the time.
+
+-   86.1% overall accuracy, well above the ~62% you'd get by naively
+    guessing "manual" every time given the class imbalance — so this
+    isn't just reflecting the imbalance back at you.
+
+This is exactly what you were testing for: real, independent evidence
+that the AST taxonomy's SelectionStep/FindExtremum split corresponds to
+a genuine distinction in embedding space, not an artifact of the rules
+themselves.
+
+The asymmetry: 14 real manual submissions predicted as builtin
+
+manual recall is only 0.86 (83/97) — 14 slip into the builtin bucket.
+This is one-directional (only 2 builtin submissions go the other way,
+into manual), which suggests builtin's cluster is tight and manual's is
+more diffuse — plausible, since "manual comparison loop" has far more
+ways to write it (variable names, loop style, early-return vs. flag
+variable) than "call max()," so some manual implementations happen to
+land embedding-wise closer to the tight builtin cluster than to their
+own looser one.
+
+The weak spot: novel, recall 0.45 — and this is the finding I predicted,
+not a failure
+
+-   Precision 1.00: every time the classifier predicts novel, it's
+    correct (5/5, zero false positives).
+
+-   Recall 0.45: but it only catches 5 of the 11 real novel submissions
+    — the other 6 (5 into manual, 1 into builtin) get missed.
+
+This is consistent with the caveat I raised before you ran this: novel
+isn't one coherent strategy, it's "everything the rules didn't
+recognize" — averaging 37 structurally-unrelated implementations into
+one centroid likely produces a centroid that's close to none of them
+individually, while some novel submissions happen to drift close enough
+to the manual or builtin clusters to get absorbed there instead.
+
+Run cell 9 next — it'll show you the spread (sim_novel mean/std) and
+which specific files are closest/furthest from the novel centroid.
+That'll tell us whether the 6 misclassified ones are genuinely scattered
+(confirming "novel isn't one cluster") or whether there's a sub-pattern
+worth naming.
+
+One design insight worth carrying into the actual semantic-backup layer,
+separate from the taxonomy-validation question: the perfect precision /
+weak recall on novel is actually informative for how you'd use this
+signal in production, not just whether the taxonomy is valid. Since the
+real semantic-backup use case is "flag for human review," recall matters
+more than precision there — missing a novel-but-correct submission means
+a human never sees it, while a false flag just costs a wasted review. A
+similarity-threshold approach ("flag if similarity to every known
+centroid falls below X" rather than "predict nearest centroid, even if
+the best match is a mediocre fit") would likely trade some of that
+perfect precision for meaningfully better recall — probably the better
+shape for the real deployment.
+
+Run cell 9 and send me the output — then I can help you decide whether
+to write this up as "AST taxonomy independently validated on 2/3
+categories, with novel's low recall itself being an informative finding"
+for the companion paper.
+
+ok, here is cell's 9 result :
+
+novel test submissions: 11
+
+sim_novel stats: mean=0.772 std=0.028
+
+closest to the novel centroid (most 'typical' novel submissions):
+
+file sim_novel sim_manual sim_builtin
+
+33 correct_5_402.py 0.813167 0.915189 0.881275
+
+150 wrong_5_101.py 0.809926 0.916768 0.878787
+
+137 wrong_5_088.py 0.792614 0.924511 0.903938
+
+42 correct_5_411.py 0.785827 0.866673 0.829154
+
+47 correct_5_416.py 0.776593 0.702845 0.681234
+
+furthest from the novel centroid (most atypical -- possibly a distinct
+sub-strategy):
+
+file sim_novel sim_manual sim_builtin
+
+20 correct_5_389.py 0.765841 0.678447 0.651689
+
+22 correct_5_391.py 0.765841 0.678447 0.651689
+
+101 wrong_5_052.py 0.749087 0.895626 0.873176
+
+0 correct_5_369.py 0.732436 0.652211 0.637974
+
+60 wrong_5_011.py 0.729592 0.699847 0.686074
+
+This is a much clearer picture than "novel is scattered" — and it's a
+genuinely sharp finding. Let me walk through the actual pattern in your
+numbers.
+
+First, std=0.028 is tight, not scattered. That already rules out my
+earlier hypothesis that novel fails because it's a grab-bag of unrelated
+strategies pulling the centroid in random directions. So something else
+is going on.
+
+Look at what sim_manual/sim_builtin are doing alongside sim_novel in
+your own table:
+
+  ------------------------------------------------------------------------
+  File              sim_novel     sim_manual      sim_builtin    winner
+  ----------------- ------------- --------------- -------------- ---------
+  correct_5_402     0.813         0.915           0.881          manual
+
+  wrong_5_101       0.810         0.917           0.879          manual
+
+  wrong_5_088       0.793         0.925           0.904          manual
+
+  correct_5_411     0.786         0.867           0.829          manual
+
+  correct_5_416     0.777         0.703           0.681          novel
+
+  correct_5_389     0.766         0.678           0.652          novel
+
+  correct_5_369     0.732         0.652           0.638          novel
+
+  wrong_5_011       0.730         0.700           0.686          novel
+  ------------------------------------------------------------------------
+
+There's a clean split, and it isn't about sim_novel itself — it's about
+the other two columns. When a submission's sim_manual/sim_builtin are
+both very high (0.83–0.93), it gets pulled into manual even though
+sim_novel is also fairly high. When a submission's
+sim_manual/sim_builtin both collapse (down to 0.65–0.70), novel wins —
+not because its own similarity went up, but because everything else went
+down further.
+
+So the real finding is: genuinely unusual code has uniformly depressed
+similarity to every centroid, including its own. The signal that
+actually separates "novel" isn't "which centroid is nearest" — it's "how
+low is the ceiling across all three." A submission that's a mild variant
+of a typical manual loop still reads as fairly similar to typical code
+overall, so manual's broad, generic pull wins the argmax even though it
+structurally scored 0. A submission that's genuinely alien to all three
+categories drags every similarity down together, and only then does
+novel surface as the winner by default.
+
+Practical implication — worth carrying straight into the real
+semantic-backup layer, not just this validation exercise: a pure
+"nearest centroid" / argmax classifier is the wrong decision rule for
+detecting novelty specifically. What you actually want is closer to
+anomaly detection: flag as novel when max(sim_manual, sim_builtin) drops
+below some threshold, regardless of whether sim_novel technically wins
+that comparison. That reframes it from a 3-way classification into "does
+this look enough like any known strategy — if not, flag it," which is a
+better match for what the semantic backup layer is actually for
+(flagging, not classifying).
+
+One aside, not core to the finding but worth a footnote:
+correct_5_389.py and correct_5_391.py have identical similarity values
+to six decimal places across all three columns — that's not a
+coincidence, that's almost certainly near-identical or duplicate source
+code (not unusual in real student corpora — two students converging on,
+or sharing, the same solution). Worth a quick diff on those two files
+out of curiosity, though it doesn't change the finding above.
+
+For the companion paper, I'd frame this as: the taxonomy's
+manual/builtin split is independently confirmed (86% agreement,
+precision/recall both strong); novel's low recall under nearest-centroid
+classification isn't evidence the embedding model fails on novel code —
+it reflects a magnitude effect where typical-looking code (including
+near-miss variants) reads as broadly similar to everything, and a
+threshold-based anomaly rule is the better-fitting decision procedure
+for this specific job. That's a much stronger, more precise finding than
+"it doesn't work" — want me to draft that as a proper paragraph, or
+update the notebook with the threshold-based version so you can actually
+test it?
+
+Paper Modif:
+
+Before I do this — one framing point worth flagging, since it directly
+touches the scope boundary we set up deliberately in this paper.
+
+The full semantic-backup-layer story (CodeBERT's anisotropy failure,
+switching models, the novel-detection recall problem,
+threshold-vs-classification design) is genuinely companion-paper
+material — that's the actual content of the layer's own validation, and
+folding it into the AST paper would blur the boundary we specifically
+built in.
+
+But what you just found is narrower and different in kind: an
+independent external check on the AST taxonomy itself, using a
+pretrained embedding model as a validation tool, not as the thing being
+evaluated. That's legitimately in-scope for the AST paper — it's
+evidence for the structural taxonomy, using a method that happens to
+involve embeddings incidentally.
+
+So my proposal: add a short, tightly-scoped subsection reporting only
+the manual/builtin agreement result (86% accuracy, precision/recall,
+confusion matrix) as external validation of that specific taxonomic
+split — explicitly excluding the novel-detection findings, since that
+recall/threshold story is really about the semantic layer's own design,
+not about validating the AST taxonomy.
+
+Let me check the working files are still here, then draft it.Good,
+everything's still here. Let's add the new subsection. It fits best
+right after §5.4 (taxonomy completion) — a fourth, independent line of
+taxonomy validation, distinct in method from the first three.Now let's
+insert the new subsection between 5.4 and 5.5, and renumber the sections
+that follow:Now let's update all downstream cross-references (the
+Robustness section moved from 5.5 to 5.6):Let's verify the final
+reference count and add a proper citation for the CodeT5+ model used in
+the new subsection, since it's now a substantive claim in this paper
+too.Confirmed real citation. Let's add it to the reference list.Now
+let's cite it inline in the new §5.5 text and check the abstract for
+whether it's worth a one-line mention:Now let's rebuild the docx and
+verify everything renders and the numbering is fully consistent.All
+references are consistent now (5.3 batch/taxonomy references unaffected,
+5.6 for defects everywhere). Let's rebuild the docx.Everything checks
+out — new section, correct numbering (5.5 → 5.6), citation properly
+placed. Let's finalize.Done — 20 pages now. Summary of what changed:
+
+-   New §5.5 "External validation of a taxonomic split via code
+    embeddings" between taxonomy completion (5.4) and defects (now 5.6):
+    reports only the manual/builtin result — 89.1% agreement,
+    precision/recall, the asymmetric-error observation — as independent
+    evidence for that split.
+
+-   Deliberately excluded: the novel/recall-0.45/anomaly-detection story
+    stays out, with an explicit sentence pointing readers to the
+    companion paper for it, so the scope boundary stays intact rather
+    than eroding one finding at a time.
+
+-   Added a real, verified citation — Wang et al. (2023), the actual
+    CodeT5+ paper (EMNLP 2023) — since the model is now a substantive
+    part of this paper's own results, not just a background tool.
+
+-   Abstract updated with one sentence on the 89.1% finding, still
+    explicit that the backup layer's own design/validation remains out
+    of scope here.
+
+-   All cross-references re-verified and fixed (5.6 now correctly points
+    to the defects/Table 4 section everywhere it's referenced).
+
+One thing worth deciding before this goes further: right now this
+section leans on a single train/test split (n=147 for the manual/builtin
+comparison). If you want this result to carry real weight in the paper
+rather than read as a single anecdotal run, it'd be worth going back to
+the notebook and running it a few times with SHUFFLE_BEFORE_SPLIT = True
+and a couple of different seeds, then reporting a mean ± spread instead
+of one number — much more defensible than a single 89.1%. Want me to
+update the notebook to do that (loop over a few seeds, aggregate the
+confusion matrices) before you rely on this figure further?
+
+Add a sentence:
+
+I'd lean against it, and here's the actual reasoning rather than just a
+preference.
+
+The manual/builtin result I added is clean because it's a closed
+question — "does an independent method agree with an existing,
+already-validated taxonomy split?" Yes/no, with a number, done. It
+doesn't require explaining how embeddings work or what the right way to
+use them is; it just uses them as a black-box check.
+
+The novel story is a different kind of thing — it's an open design
+question, not a closed check. To present it honestly, you'd have to
+explain:
+
+-   Why nearest-centroid/argmax gave weak recall (0.45)
+
+-   The magnitude-effect finding (typical code reads as similar to
+    everything, so novelty gets swallowed by whichever broad category
+    has the loosest boundary)
+
+-   That a threshold-based "how far from every centroid" approach is
+    probably the right fix, but hasn't been tried yet
+
+That's not a validation check anymore — that's the actual research
+content of "how do you build a good novelty detector with code
+embeddings," which is the companion paper's central question. Including
+it here wouldn't just touch the scope boundary, it would substantively
+preview the companion paper's main contribution before that paper has
+even validated the fix.
+
+There's also a data-quality problem specific to novel, separate from the
+scope issue: n=11 in the test set, one single (unshuffled) split, and no
+threshold-based approach even attempted yet. The manual/builtin number
+(89.1%, n=147) is stable enough to put in a paper. The novel number (45%
+recall, n=11) really isn't — it's a working observation from one
+debugging session, not a result.
+
+My actual recommendation: add one sentence to the existing Limitations
+section (§7 already discusses "the model can only recognize strategies
+someone wrote a rule for") — something like:
+
+A preliminary check using the same embedding model to attempt automatic
+novel-strategy detection, rather than validation of an existing split,
+is reported in the companion paper; early results suggest this is a
+harder problem than the manual/builtin check above, requiring a
+different decision rule than nearest-centroid classification.
+
+That gives the reader a forward pointer and an honest one-line preview,
+without committing an unstable n=11 number to a paper that's otherwise
+fully validated, and without pulling the companion paper's actual
+contribution into this one.
+
+Want me to add that sentence, or would you rather go the other direction
+and include the fuller novel discussion despite the scope/stability
+tradeoffs? Your call either way — I've made the case, not trying to
+relitigate it further.
+
+To do update and verify the paper. 04/08/2026
+
+Here's the caching + multi-seed loop. To avoid re-embedding all 526
+files N times (expensive and pointless — the embeddings themselves don't
+depend on the split), I embed everything once upfront, then just
+re-shuffle/re-split/re-classify per seed using the cached vectors.
+
+Cell A — embed everything once (run this before the loop):
+
+# Pre-embed every file once. Embeddings don't depend on the train/test
+
+# split, so there's no need to recompute them per seed.
+
+embedding_cache = {}
+
+for fname in labeled["file"]:
+
+src = read_src(fname)
+
+if src is not None:
+
+embedding_cache[fname] = codebert_embed(src)
+
+print(f"cached {len(embedding_cache)} embeddings out of {len(labeled)}
+files")
+
+Cell B — the multi-seed loop:
+
+import numpy as np
+
+from sklearn.metrics import accuracy_score
+
+SEEDS = list(range(10)) # 10 runs; bump this up if you want tighter
+estimates
+
+labels_order = ["manual", "builtin", "novel"]
+
+per_seed_results = []
+
+for seed in SEEDS:
+
+shuffled = labeled.sample(frac=1,
+random_state=seed).reset_index(drop=True)
+
+split_point = int(len(shuffled) * 0.7)
+
+train_df_s = shuffled.iloc[:split_point]
+
+test_df_s = shuffled.iloc[split_point:]
+
+# Build centroids from cached embeddings -- no re-embedding
+
+centroids_s = {}
+
+for label in labels_order:
+
+files = train_df_s[train_df_s["structural_label"] ==
+label]["file"].tolist()
+
+vecs = [embedding_cache[f] for f in files if f in embedding_cache]
+
+centroids_s[label] = np.mean(vecs, axis=0)
+
+# Classify test set by nearest centroid
+
+rows = []
+
+for _, row in test_df_s.iterrows():
+
+f = row["file"]
+
+if f not in embedding_cache:
+
+continue
+
+emb = embedding_cache[f]
+
+sims = {label: cosine_sim(emb, c) for label, c in centroids_s.items()}
+
+predicted = max(sims, key=sims.get)
+
+rows.append({"file": f, "structural_label": row["structural_label"],
+"semantic_predicted": predicted})
+
+results_s = pd.DataFrame(rows)
+
+# Full 3-way accuracy
+
+acc_3way = accuracy_score(results_s["structural_label"],
+results_s["semantic_predicted"])
+
+# Manual/builtin-only accuracy -- the figure actually reported in the
+paper
+
+mb_only = results_s[results_s["structural_label"].isin(["manual",
+"builtin"])]
+
+acc_mb = accuracy_score(mb_only["structural_label"],
+mb_only["semantic_predicted"])
+
+# Novel recall specifically, since that's the unstable one
+
+novel_rows = results_s[results_s["structural_label"] == "novel"]
+
+novel_recall = (novel_rows["semantic_predicted"] == "novel").mean() if
+len(novel_rows) else float("nan")
+
+per_seed_results.append({
+
+"seed": seed,
+
+"acc_3way": acc_3way,
+
+"acc_manual_builtin": acc_mb,
+
+"novel_recall": novel_recall,
+
+"n_test": len(results_s),
+
+"n_novel_test": len(novel_rows),
+
+})
+
+summary_df = pd.DataFrame(per_seed_results)
+
+print(summary_df)
+
+print()
+
+print(f"3-way accuracy: mean={summary_df['acc_3way'].mean():.3f}
+std={summary_df['acc_3way'].std():.3f}")
+
+print(f"manual/builtin acc:
+mean={summary_df['acc_manual_builtin'].mean():.3f}
+std={summary_df['acc_manual_builtin'].std():.3f}")
+
+print(f"novel recall: mean={summary_df['novel_recall'].mean():.3f}
+std={summary_df['novel_recall'].std():.3f}")
+
+A couple of things to expect / watch for:
+
+-   Seed 0 in this loop should reproduce almost exactly the 83.5%/85.2%
+    numbers you just got by hand (small floating-point differences
+    possible depending on .sample()'s internal RNG vs. however you
+    shuffled before, but should be very close) — worth a quick sanity
+    check that it does.
+
+-   With only 10 seeds and novel's thin test size (~11-16 per split),
+    the novel_recall std will likely be large relative to its mean —
+    that's expected and itself informative, not a bug.
+
+-   If you want tighter estimates for the paper, bump SEEDS to 30 or 50
+    — embedding is already cached, so the loop itself is cheap; only the
+    centroid-averaging and classification math repeats.
+
+Run Cell A once, then Cell B, and send me the printed summary_df plus
+the three mean/std lines — that's what goes into the paper's §5.5
+update.

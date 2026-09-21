@@ -1,0 +1,33 @@
+{
+  "experiment": "q5_topk",
+  "description": "Q5 (Top-K exercise): manual (SelectionStep) vs. builtin (FindExtremum) vs. novel taxonomic split, cross-validated against codet5p-110m-embedding.",
+  "n_labeled_total": 526,
+  "label_counts": {
+    "manual": 327,
+    "builtin": 151,
+    "novel": 48
+  },
+  "split_fraction_train": 0.7,
+  "n_splits": 10,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "generation_method": "labeled = report[report['structural_label'].isin(['manual','builtin','novel'])].reset_index(drop=True); for seed in range(10): shuffled = labeled.sample(frac=1, random_state=seed).reset_index(drop=True); split_point = int(len(shuffled) * 0.7); train = shuffled.iloc[:split_point]; test = shuffled.iloc[split_point:]",
+  "structural_label_rule": "manual if SelectionStep_final >= 0.99; elif builtin if FindExtremum_final >= 0.99; elif novel if FindExtremum_final == 0; else excluded ('partial')",
+  "source_report_csv": "topk_report.csv (from batch_report.py's Q5 run, pulled from Drive, 526 rows)",
+  "source_notebook": "ast_taxonomy_crossvalidation.ipynb (Drive fileId 1y3ceEx6t8OZnlGtDxFVRhLYp7tZR4yPJ)",
+  "reported_metric": "manual/builtin accuracy: mean=0.870, std=0.023 (pooled over the 10 seeds' test predictions) -- confirmed verbatim in the notebook's executed output",
+  "verification": {
+    "seed_0": "INDEPENDENTLY CONFIRMED: seed 0's replayed test-set file list is a byte-for-byte exact match (158/158 files) to the notebook's own recorded, saved single-split output (ast_taxonomy_crossvalidation_results.csv, Drive fileId 1LvktsPJKll_J4LWKkQWY9-MBP_VuEjcA), which used the identical labeled dataframe, SPLIT_SEED=0, and split code.",
+    "seeds_1_9": "REPLAYED, not independently recorded: the notebook's multi-seed loop (cell 24) never exported per-seed train/test file lists to Drive or to a downloaded file -- only the aggregate mean/std accuracy was printed and saved. These 9 splits are produced by re-running the exact confirmed deterministic procedure (identical code, identical input CSV, identical seeds) against the same topk_report.csv the notebook read. Given seed 0's exact match above and pandas' RandomState-seeded sample() being fully deterministic for a fixed input frame, seeds 1-9 are expected to reproduce the notebook's original splits exactly, but this could not be checked against an independently recorded artifact because none exists."
+  }
+}

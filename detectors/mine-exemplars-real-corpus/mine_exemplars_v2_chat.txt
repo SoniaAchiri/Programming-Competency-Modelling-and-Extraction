@@ -1,0 +1,1162 @@
+This is the real Refactory corpus. Let's extract it and get a full
+picture:Good, extraction did complete. Let's map the full structure:Real
+Refactory corpus, exactly matching the questions referenced throughout
+your scripts. Let's set it up at the path your existing code already
+expects (/home/claude/refactory/data/...), so test_real_data.py,
+q1_competencies.py, etc. work unmodified:Now let's confirm
+test_real_data.py runs cleanly against the real corpus — this validates
+the whole structural model still works end to end before we build any
+mining on top of it:Works perfectly against the real data. Now let's
+build the exemplar mining script. First let's check q1_competencies.py
+and q2_competencies.py also run cleanly (they're needed since
+q2_competencies.py registers AccumulateThenCount etc. on top of a
+pw01_competencies model we don't have):Let's inspect the real files to
+confirm structure before building the mining pipeline — Question 2
+apparently has three functions per submission (unique_day, unique_month,
+contains_unique_day), so I need to scope correctly:Confirmed — both real
+strategies genuinely occur in the wild, exactly as your project's own
+comments describe. Let's build the actual mining pipeline. First I need
+AccumulateThenCount registered without the missing pw01_competencies.py
+dependency — I can reconstruct just what's needed on top of
+test_real_data.py's model, since it already has Accumulation and
+ConditionalCount:Correctly discriminates the two strategies on real
+data. Now let's build the full mining script:Now let's run it:This is a
+striking result worth flagging immediately: ConditionalCount has real,
+verified examples in 248/291 submissions with 66 distinct structural
+shapes — a rich mining pool. But AccumulateThenCount only verified in 2
+of 291, and both collapse to the same structural shape. That's a real,
+unexpected finding in its own right — let me check something before
+going further:This confirms something important, and it's not good news
+for the earlier experiment: 2 of my 3 hand-written AccumulateThenCount
+exemplars (count_evens, count_long_words) score 0.0 under the actual
+structural rule — they aren't real examples of this competency at all.
+The rule specifically requires .count( in the output; my exemplars used
+len(...) instead, which doesn't match. Let me check ConditionalCount
+too, for the same integrity issue:This changes the interpretation of the
+earlier results — part of AccumulateThenCount's underperformance may
+reflect mislabeled exemplars, not the competency's actual embeddability.
+Let me check whether unique_month (same file, same underlying strategy
+pool) gives more real diversity before finalizing anything:Confirmed
+independently on unique_month: still only 2/291, still the same single
+structural shape (in fact the same two students used this strategy for
+both functions). This isn't a mining limitation — it's a real, robust
+fact about the data: AccumulateThenCount is a genuinely rare strategy
+(occurs in under 1% of correct submissions), with essentially zero real
+structural diversity available to mine.
+
+Given that, I need to fix my earlier hand-written exemplars properly —
+not just find more real ones (there aren't more to find), but rewrite
+the invalid ones so they actually satisfy the real rule (.count(
+specifically, not len(...)):sentence_tuple passes, list_append doesn't
+(worth knowing: the real rule is pickier about .append()-style
+accumulation than the tuple-concatenation pattern — a good thing to be
+aware of, not something to fight). Let's find one more valid,
+domain-diverse variant to get back to 3 total:Now let's update the
+registry with a mix of real-mined ConditionalCount examples (real
+diversity is abundant here) and the corrected AccumulateThenCount set (1
+real + 2 now-valid synthetic, since real diversity doesn't exist for
+this one):That's odd — let me verify what's actually on disk right now,
+since that GuardedInput comment references things I haven't created yet
+in this session:Confirmed — this is my own work from earlier in this
+turn, before some tool outputs got cleared from my visible context, but
+the actual file changes persisted. Let me see the rest of the file to
+reconstruct the full current state before continuing:Let's run the audit
+function I'd apparently already built, using the properly combined model
+(with AccumulateThenCount included via q2_extra.py), to get a complete
+picture before making further edits:Confirmed: AccumulateThenCount
+exemplars #1 and #2 are the only remaining problem — everything else
+(including the GuardedInput fix) checks out clean. Let's fix
+AccumulateThenCount with the corrected, verified exemplars:Now let's
+also strengthen ConditionalCount with genuinely mined real examples (it
+already had one real-equivalent exemplar plus valid synthetic ones, but
+let's add real mined diversity directly, to make this a true "real vs.
+hand-written" comparison):Now let's re-run the audit to confirm
+everything is clean, then run the validation:All clean now. Let's re-run
+the lexical validation with the fully corrected, real-mining-augmented
+registry:Substantial improvement for lexical: win rate jumped from 86.7%
+→ 90.8%, worst-case ranking from 47.4% → 66.7%. And the
+ConditionalCount/AccumulateThenCount confusion — while not fully gone —
+narrowed to a much closer margin (0.657 vs 0.678, versus the previous
+0.664 gap on invalid data). Let's confirm report.py integration still
+works, then push everything to Colab so we can see the real test:
+whether codet5p's 0.959-level confusion also softens on this corrected,
+real data.Good, still works cleanly. Now let's finish the findings doc
+update (the "finding #7" the comments already reference) and rebuild the
+notebook for a Colab re-run with codet5p:Good — only semantic_backup.py
+changed. Now let's rebuild the notebook with the corrected
+registry:Interesting — 16 cells now, not 14. Let me check what was
+added:That cell would incorrectly flag AccumulateThenCount as
+unregistered, since it uses test_real_data.model directly rather than
+the extended model from q2_extra.py. Let's fix that and add q2_extra.py
+to the notebook's file-writing step:Now let's fix the audit cell and add
+q2_extra.py writing:Now let's also update the intro markdown and the
+mining context, and add a note that this registry now includes
+real-mined exemplars:Now rebuild and validate:Real dataset extracted and
+used. Here's what came out of it — including one thing that needed
+fixing before the mining itself could even happen.
+
+An integrity bug found along the way
+
+While setting up the mining, I checked whether the hand-written
+exemplars actually satisfy the real structural rules they're supposed to
+represent (they'd never been checked). They mostly didn't:
+GuardedInput's two original exemplars both scored 0.0 (a bare while
+condition doesn't count as a TEST — the rule needs an explicit if), and
+2 of 3 AccumulateThenCount exemplars also scored 0.0 (the rule requires
+.count( specifically; my len(...)-based versions didn't qualify). Part
+of the earlier AccumulateThenCount vs. ConditionalCount confusion was
+resting on mislabeled data. Both are now fixed and verified — I added an
+audit_registry() function to semantic_backup.py that checks every
+exemplar against the real resolver, so this can't silently drift again.
+
+What mining the real corpus found
+
+-   ConditionalCount: 248/291 real submissions (85%) verify at
+    final_score=1.0, across 66 distinct structural shapes. Rich, real
+    diversity — added two genuinely mined examples.
+
+-   AccumulateThenCount: only 2/291 verify, and both collapse to the
+    same shape — confirmed independently against the analogous
+    unique_month function (same two students, same pattern). This is a
+    real, standalone finding: it's a genuinely rare strategy in
+    practice, not just under-sampled. No amount of further mining will
+    produce more real diversity here — I filled the gap with
+    structurally-verified synthetic exemplars instead.
+
+Result (lexical, local)
+
+  ------------------------------------------------------------------------
+                     previous (corrupted registry) corrected + real-mined
+  ------------------ ----------------------------- -----------------------
+  pairwise win rate  86.7%                         90.8%
+
+  worst-case ranking 47.4%                         66.7%
+  ------------------------------------------------------------------------
+
+The ConditionalCount/AccumulateThenCount confusion narrowed too — the
+closest failing margin is now 0.657 vs. 0.678, much tighter than before.
+
+What I can't tell you yet: whether codet5p's much larger 0.959-level
+confusion also softens on this corrected data — that needs the Colab
+run. I fixed the notebook's audit cell too (it was pointed at the wrong
+model and would've falsely flagged AccumulateThenCount as unregistered)
+and added the missing q2_extra.py write step it depended on.
+
+Next step: re-run Cells 3, 3b, and 4 in Colab. Cell 3b now gives you the
+audit output directly — should print "all clean." I'd hold off updating
+the findings doc until we have the codet5p number for this corrected
+data, since the story isn't complete without it.
+
+08_08 at 21:47
+
+========================================================================
+
+backend = 'lexical'
+
+========================================================================
+
+Competencies with exemplars: 8 | held-out cases: 21
+
+SAME mean=+0.595 median=+0.616 n=42
+
+CROSS mean=+0.369 median=+0.372 n=378
+
+UNRELATED mean=+0.286 median=+0.266 n=63
+
+Worst-case correct ranking (best SAME > worst of ALL others): 14/21
+(66.7%) [strict, see docstring]
+
+Failures (what beat the held-out SAME pair):
+
+Accumulation best_same=+0.522 beaten by GuardedInput sim=+0.576
+
+Accumulation best_same=+0.391 beaten by ConditionalCount sim=+0.540
+
+Accumulation best_same=+0.522 beaten by SelectionStep sim=+0.611
+
+AccumulateThenCount best_same=+0.657 beaten by ConditionalCount
+sim=+0.678
+
+GuardedInput best_same=+0.502 beaten by Accumulation sim=+0.576
+
+GuardedInput best_same=+0.502 beaten by UNRELATED sim=+0.522
+
+SelectionStep best_same=+0.524 beaten by TopKPattern sim=+0.625
+
+Pairwise win rate (SAME beats random OTHER): 774/852 (90.8%) [standard
+AUC-style metric]
+
+Verdict: strong discriminative power
+
+========================================================================
+
+backend = 'codet5p'
+
+========================================================================
+
+Warning: You are sending unauthenticated requests to the HF Hub. Please
+set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+config.json: 100% 1.05k/1.05k [00:00<00:00, 3.01MB/s]
+
+configuration_codet5p_embedding.py: 100% 2.62k/2.62k [00:00<00:00,
+5.48MB/s]
+
+[transformers] A new version of the following files was downloaded from
+https://huggingface.co/Salesforce/codet5p-110m-embedding:
+
+- configuration_codet5p_embedding.py
+
+. Make sure to double-check they do not contain any added malicious
+code. To avoid downloading new versions of the code file, you can pin a
+revision.
+
+tokenizer_config.json: 100% 1.34k/1.34k [00:00<00:00, 5.32MB/s]
+
+vocab.json: 100% 511k/511k [00:00<00:00, 26.6MB/s]
+
+merges.txt: 100% 294k/294k [00:00<00:00, 96.0MB/s]
+
+tokenizer.json: 100% 1.37M/1.37M [00:00<00:00, 131MB/s]
+
+added_tokens.json: 100% 59.0/59.0 [00:00<00:00, 266kB/s]
+
+special_tokens_map.json: 100% 1.03k/1.03k [00:00<00:00, 3.35MB/s]
+
+modeling_codet5p_embedding.py: 100% 1.93k/1.93k [00:00<00:00, 7.27MB/s]
+
+[transformers] A new version of the following files was downloaded from
+https://huggingface.co/Salesforce/codet5p-110m-embedding:
+
+- modeling_codet5p_embedding.py
+
+. Make sure to double-check they do not contain any added malicious
+code. To avoid downloading new versions of the code file, you can pin a
+revision.
+
+pytorch_model.bin: downloading bytes: 54% 236M/439M [00:01<00:00,
+244MB/s, 21.4MB/s ]
+
+pytorch_model.bin: downloading bytes: 64% 282M/439M [00:02<00:00,
+201MB/s, 24.3MB/s ]
+
+pytorch_model.bin: downloading bytes: 82% 360M/439M [00:02<00:00,
+264MB/s, 29.3MB/s ]
+
+pytorch_model.bin: downloading bytes: 90% 397M/439M [00:02<00:00,
+152MB/s, 34.4MB/s ]
+
+pytorch_model.bin: downloading bytes: 100% 417M/417M [00:03<00:00,
+125MB/s, 35.2MB/s ]
+
+pytorch_model.bin: reconstructing file: 100% 439M/439M [00:03<00:00,
+131MB/s, 38.3MB/s ]
+
+Loading weights: 100% 102/102 [00:00<00:00, 24670.95it/s]
+
+[transformers] `use_return_dict` is deprecated! Use `return_dict`
+instead!
+
+Competencies with exemplars: 8 | held-out cases: 21
+
+SAME mean=+0.615 median=+0.552 n=42
+
+CROSS mean=+0.400 median=+0.374 n=378
+
+UNRELATED mean=+0.303 median=+0.294 n=63
+
+Worst-case correct ranking (best SAME > worst of ALL others): 16/21
+(76.2%) [strict, see docstring]
+
+Failures (what beat the held-out SAME pair):
+
+Accumulation best_same=+0.408 beaten by GuardedInput sim=+0.548
+
+ConditionalCount best_same=+0.570 beaten by Accumulation sim=+0.647
+
+AccumulateThenCount best_same=+0.552 beaten by ConditionalCount
+sim=+0.972
+
+AccumulateThenCount best_same=+0.552 beaten by ConditionalCount
+sim=+0.556
+
+SelectionStep best_same=+0.729 beaten by FindExtremumBuiltin sim=+0.787
+
+Pairwise win rate (SAME beats random OTHER): 696/852 (81.7%) [standard
+AUC-style metric]
+
+Verdict: real, moderate discriminative power -- better than chance, not
+yet strong
+
+To give to black pc claude to interpret results and ask for findings “to
+update”.
+
+Result of cell: end to end integration
+
+Warning: You are sending unauthenticated requests to the HF Hub. Please
+set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+WARNING:huggingface_hub.utils._http:Warning: You are sending
+unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable
+higher rate limits and faster downloads.
+
+Loading weights: 100%
+
+ 102/102 [00:00<00:00, 3819.54it/s]
+
+============================================================
+
+moyenne() -- integration smoke test (codet5p)
+
+============================================================
+
+PRIMITIVES DETECTED
+
+DECL x1
+
+line 3: total declared
+
+INPUT x1
+
+line 5: input() -> note
+
+PARAM x1
+
+line 2: parameter n
+
+FUNC_DEF x1
+
+line 2: def moyenne(1 params), returns a value
+
+OUTPUT x1
+
+line 7: output: total
+
+LOOP x1
+
+line 4: for i in range(n)
+
+ASSIGN x3
+
+line 3: total = 0
+
+line 5: note = float(input('Note: '))
+
+line 6: total = total Add note
+
+ADVANCED COMPETENCIES
+
+OK Accumulation final=1.00 (coverage=1.00 structural=1.00)
+
+present: decl, loop, assign
+
+-- TopKPattern final=0.00 (coverage=0.33 structural=0.00)
+
+present: loop
+
+missing: select, remove
+
+semantic backup (codet5p): 0.42 similarity to exemplar #1 -- UNVERIFIED,
+flag for manual review, not auto-credited
+
+09_08
+
+This is the missing piece — now I can use the real q2_competencies.py →
+pw01_competencies.py chain instead of my q2_extra.py reconstruction.
+Let's verify my reconstruction was faithful, and switch over
+properly.Clean import, no conflicts (both files register an identical
+OutputStep, so the duplicate is harmless). Let's verify my q2_extra.py
+reconstruction gave identical results to the real chain, as a sanity
+check:Excellent — this confirms my q2_extra.py workaround was faithful:
+0 mismatches across 20 real submissions and both competencies.
+Everything mined and audited so far holds up against the authentic model
+chain.
+
+Now that I have the real pw01_competencies.py, a few things become
+possible that weren't before:
+
+1.  q2_competencies.py's full UniqueCheck model is now usable —
+    including FunctionalUniqueCheck (the third real strategy your
+    project found: map()/filter() pipelines with no explicit loop),
+    which I couldn't test before since it wasn't registered anywhere I
+    had access to.
+
+2.  DelegatesUniqueness — a cross-function competency for
+    contains_unique_day (which calls unique_day and checks whether the
+    callee genuinely implements ConditionalCount, via DELEGATES). The
+    real corpus has contains_unique_day in every question_2 file, so
+    this is now testable against real data too, and it's not in the
+    exemplar registry at all yet.
+
+3.  Going forward, I can retire q2_extra.py and use the real
+    test_real_data.py → pw01_competencies.py → q2_competencies.py chain
+    directly, which is more correct than my reconstruction (even though
+    it happened to match perfectly).
+
+Good, matches my expectation. Now let's extend mine_exemplars.py —
+retiring q2_extra.py in favor of the real chain, and adding mining for
+both new competencies:Now let's add a second mining function that
+handles cross-function competencies (needed for DelegatesUniqueness,
+which needs the full module tree):Now let's run it:Let's identify which
+of the three real functional strategies each mined example actually
+represents (matching the sub-branches your own code already models), for
+accurate documentation:Perfect coverage — my three mined examples map
+exactly onto the three real sub-strategies your project's own comments
+describe. Let's add both new competencies to the exemplar registry with
+real, mined, verified data:Found the reason — DELEGATES needs unique_day
+visible in the same parsed tree as contains_unique_day (audit correctly
+defaults module_tree to the exemplar's own parse). I need to include
+both functions together, exactly as they appear in the real files:Now
+let's update the exemplars to include both functions, and verify against
+the real audit:One more subtlety worth flagging honestly: this
+two-function exemplar is necessary for audit_registry to actually verify
+DelegatesUniqueness structurally, but it doesn't perfectly match what
+report.py would compare it against at runtime (which only passes the
+target function's own text when function_name is scoped, not its
+callees). Let me document that mismatch rather than let it hide:Now
+let's re-run the audit to confirm everything verifies clean:All clean,
+10 competencies now. Let's run the full validation with lexical:A new,
+but explainable, confusion appeared: DelegatesUniqueness vs.
+ConditionalCount at very high similarity (0.901). This makes sense once
+you see why — my DelegatesUniqueness exemplars literally contain a full
+ConditionalCount implementation (unique_day) inside them, so of course
+they overlap heavily with ConditionalCount's own exemplars. Not a
+mysterious embedding failure — a direct consequence of the
+scope-mismatch I flagged in the code comment. FunctionalUniqueCheck
+integrated cleanly with zero failures involving it, worth noting as a
+clean win. Overall: 88.4% win rate, still "strong discriminative power."
+
+Let's update the notebook — it now needs pw01_competencies.py and
+q2_competencies.py uploaded, and should retire q2_extra.py:Now let's
+remove the q2_extra.py write cell and fix the audit cell to use the real
+chain:Now let's update the intro markdown to reflect the current
+state:Now let's rebuild and validate:Let's double check the full cell
+listing to be sure everything's coherent:Clean structure. Now let's
+confirm report.py integration still works with the final registry, then
+ship everything:Good, still works cleanly. Let's ship the final files:##
+Summary of this round
+
+Both mining targets succeeded, using the real model chain now that
+pw01_competencies.py closed the gap (verified my earlier q2_extra.py
+workaround was faithful — 0 mismatches on 20 real submissions — before
+retiring it).
+
+-   FunctionalUniqueCheck: 13/291 (4.5%) real submissions verify, with
+    11 distinct shapes. Picked one exemplar per real sub-strategy —
+    confirmed each maps exactly to InlineFunctionalCheck,
+    GuardedFunctionalCheck, and InlineTestFunctionalCheck respectively.
+    Integrated with zero confusions in the validation run.
+
+-   DelegatesUniqueness: 227/291 (78%) verify — a common,
+    well-represented real pattern, 96 distinct shapes. Needed the whole
+    module tree (not just the isolated function) since DELEGATES checks
+    a cross-function call edge.
+
+One design tension I found and documented rather than papered over:
+DelegatesUniqueness exemplars need to contain unique_day alongside
+contains_unique_day for audit_registry to verify them at all (otherwise
+DELEGATES can't find the callee). But report.py only ever passes the
+target function's own text at runtime, not its callees — so there's a
+real scope mismatch between what's verified and what's actually compared
+in production. Flagged in a code comment rather than silently accepted.
+
+Registry now: 10 competencies, all audit-clean. Full lexical run: 88.4%
+win rate, still "strong." One new, fully explainable confusion appeared
+(DelegatesUniqueness vs. ConditionalCount at 0.901) — direct consequence
+of that same scope-mismatch design choice, not a mysterious embedding
+failure.
+
+Still open: the codet5p number for this fuller, corrected registry —
+needs Colab. Notebook's upload step now asks for 5 files
+(pw01_competencies.py and q2_competencies.py added), and the audit cell
+uses the real chain.
+
+It gives me the last version of files_mines_exemplars_final
+
+Yes — confirmed. This is the 8-competency version (before I added
+FunctionalUniqueCheck and DelegatesUniqueness). I can tell exactly: the
+lexical numbers here (774/852, 90.8% win rate) match my local run from
+that round precisely. The current notebook I shipped last has 10
+competencies, and would give different numbers.
+
+Since you have it, though, it's worth reading — this is the
+corrected/real-mined registry vs. codet5p, and it settles something we'd
+been going back and forth on:
+
+  -----------------------------------------------------------------------
+  metric                                 lexical        codet5p
+  -------------------------------------- -------------- -----------------
+  pairwise win rate                      90.8%          81.7%
+
+  worst-case ranking                     66.7%          76.2%
+  -----------------------------------------------------------------------
+
+Same pattern as before the corrections: lexical wins on average
+discrimination, codet5p wins on worst-case consistency. The correction
+didn't flip the story, it just raised both backends' numbers roughly in
+parallel.
+
+One new, striking data point: AccumulateThenCount vs. ConditionalCount
+under codet5p hit 0.972 similarity in one comparison — even higher than
+the 0.959 we saw before, on data that's now fully real and verified (no
+more mislabeled exemplars to blame). But notice it's inconsistent — the
+other failing comparison for the same pair was only 0.556. That's
+different from the earlier pattern (0.959, 0.577, 0.721 — all clearly
+elevated). Here it looks more like one specific real ConditionalCount
+exemplar (probably the range(len(...))-indexed style, which shares more
+surface tokens with the tuple-accumulation shape) is an outlier pull,
+rather than a uniform class-level confusion. Worth checking against the
+full 10-competency run rather than reading too much into this alone.
+
+Since this run predates the FunctionalUniqueCheck/DelegatesUniqueness
+additions, it's superseded — could you re-run the current notebook (5
+files to upload now: competency.py, report.py, test_real_data.py,
+pw01_competencies.py, q2_competencies.py) so we get codet5p's number
+against the full, current 10-competency registry, including how it
+handles the new DelegatesUniqueness/ConditionalCount overlap I flagged
+as expected?
+
+10/08/2026
+
+The last run result
+
+========================================================================
+
+backend = 'lexical'
+
+========================================================================
+
+Competencies with exemplars: 10 | held-out cases: 27
+
+SAME mean=+0.648 median=+0.657 n=54
+
+CROSS mean=+0.416 median=+0.408 n=648
+
+UNRELATED mean=+0.295 median=+0.285 n=81
+
+Worst-case correct ranking (best SAME > worst of ALL others): 15/27
+(55.6%) [strict, see docstring]
+
+Failures (what beat the held-out SAME pair):
+
+Accumulation best_same=+0.522 beaten by GuardedInput sim=+0.576
+
+Accumulation best_same=+0.391 beaten by ConditionalCount sim=+0.540
+
+Accumulation best_same=+0.522 beaten by SelectionStep sim=+0.611
+
+ConditionalCount best_same=+0.827 beaten by DelegatesUniqueness
+sim=+0.901
+
+ConditionalCount best_same=+0.676 beaten by DelegatesUniqueness
+sim=+0.716
+
+ConditionalCount best_same=+0.827 beaten by DelegatesUniqueness
+sim=+0.841
+
+AccumulateThenCount best_same=+0.657 beaten by DelegatesUniqueness
+sim=+0.715
+
+GuardedInput best_same=+0.502 beaten by Accumulation sim=+0.576
+
+GuardedInput best_same=+0.502 beaten by UNRELATED sim=+0.522
+
+SelectionStep best_same=+0.524 beaten by TopKPattern sim=+0.625
+
+DelegatesUniqueness best_same=+0.871 beaten by ConditionalCount
+sim=+0.901
+
+DelegatesUniqueness best_same=+0.791 beaten by ConditionalCount
+sim=+0.812
+
+Pairwise win rate (SAME beats random OTHER): 1262/1428 (88.4%) [standard
+AUC-style metric]
+
+Verdict: strong discriminative power
+
+========================================================================
+
+backend = 'codet5p'
+
+========================================================================
+
+config.json: 100% 1.05k/1.05k [00:00<00:00, 3.61MB/s]
+
+Warning: You are sending unauthenticated requests to the HF Hub. Please
+set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+configuration_codet5p_embedding.py: 100% 2.62k/2.62k [00:00<00:00,
+6.10MB/s]
+
+[transformers] A new version of the following files was downloaded from
+https://huggingface.co/Salesforce/codet5p-110m-embedding:
+
+- configuration_codet5p_embedding.py
+
+. Make sure to double-check they do not contain any added malicious
+code. To avoid downloading new versions of the code file, you can pin a
+revision.
+
+tokenizer_config.json: 100% 1.34k/1.34k [00:00<00:00, 5.34MB/s]
+
+vocab.json: 100% 511k/511k [00:00<00:00, 35.1MB/s]
+
+merges.txt: 100% 294k/294k [00:00<00:00, 96.0MB/s]
+
+tokenizer.json: 100% 1.37M/1.37M [00:00<00:00, 137MB/s]
+
+added_tokens.json: 100% 59.0/59.0 [00:00<00:00, 402kB/s]
+
+special_tokens_map.json: 100% 1.03k/1.03k [00:00<00:00, 3.91MB/s]
+
+modeling_codet5p_embedding.py: 100% 1.93k/1.93k [00:00<00:00, 6.88MB/s]
+
+[transformers] A new version of the following files was downloaded from
+https://huggingface.co/Salesforce/codet5p-110m-embedding:
+
+- modeling_codet5p_embedding.py
+
+. Make sure to double-check they do not contain any added malicious
+code. To avoid downloading new versions of the code file, you can pin a
+revision.
+
+pytorch_model.bin: downloading bytes: 38% 167M/439M [00:01<00:01,
+210MB/s, 12.7MB/s ]
+
+pytorch_model.bin: downloading bytes: 60% 264M/439M [00:02<00:00,
+195MB/s, 21.7MB/s ]
+
+pytorch_model.bin: downloading bytes: 74% 327M/439M [00:02<00:00,
+196MB/s, 28.3MB/s ]
+
+pytorch_model.bin: downloading bytes: 93% 408M/439M [00:03<00:00,
+72.2MB/s, 33.2MB/s ]
+
+pytorch_model.bin: downloading bytes: 100% 417M/417M [00:04<00:00,
+88.0MB/s, 31.6MB/s ]
+
+pytorch_model.bin: reconstructing file: 100% 439M/439M [00:04<00:00,
+92.6MB/s, 35.5MB/s ]
+
+Loading weights: 100% 102/102 [00:00<00:00, 28799.66it/s]
+
+[transformers] `use_return_dict` is deprecated! Use `return_dict`
+instead!
+
+Competencies with exemplars: 10 | held-out cases: 27
+
+SAME mean=+0.695 median=+0.729 n=54
+
+CROSS mean=+0.438 median=+0.374 n=648
+
+UNRELATED mean=+0.288 median=+0.282 n=81
+
+Worst-case correct ranking (best SAME > worst of ALL others): 22/27
+(81.5%) [strict, see docstring]
+
+Failures (what beat the held-out SAME pair):
+
+Accumulation best_same=+0.408 beaten by GuardedInput sim=+0.548
+
+ConditionalCount best_same=+0.570 beaten by Accumulation sim=+0.647
+
+AccumulateThenCount best_same=+0.552 beaten by ConditionalCount
+sim=+0.972
+
+AccumulateThenCount best_same=+0.552 beaten by DelegatesUniqueness
+sim=+0.566
+
+SelectionStep best_same=+0.729 beaten by FindExtremumBuiltin sim=+0.787
+
+Pairwise win rate (SAME beats random OTHER): 1203/1428 (84.2%) [standard
+AUC-style metric]
+
+Verdict: real, moderate discriminative power -- better than chance, not
+yet strong
+
+This is the complete picture now — 10 competencies, both backends, on
+fully corrected and real-mined data. And it shifts the story again, in
+an interesting way.## Two things worth separating out
+
+1. The ConditionalCount/AccumulateThenCount confusion is now rock-solid
+evidence, not a fluke. 0.972 similarity under codet5p — the highest yet,
+across the cleanest data we've had (fully audited, partly real-mined).
+Three independent rounds, increasingly clean data, same result every
+time. I'm now confident this is a genuine, stable property of how
+codet5p represents these two operations, not a data-quality artifact.
+
+2. But something new and favorable to codet5p showed up, and it's worth
+naming clearly. Look at the number of distinct confusions, not just the
+aggregate score:
+
+-   lexical: 6 different competency pairs fail, including a bad one —
+    ConditionalCount gets beaten by DelegatesUniqueness in three
+    separate held-out cases (0.901, 0.841, 0.716), plus the reverse
+    twice more. That's exactly the surface-containment confound I
+    flagged when I built DelegatesUniqueness's exemplars (they literally
+    contain a full ConditionalCount implementation inside them) — and
+    lexical, being a bag-of-tokens method, gets fooled by it badly.
+
+-   codet5p: only 3 pairs fail total, and it's almost entirely not
+    fooled by that same containment confound — only one weak instance
+    (0.566, AccumulateThenCount/DelegatesUniqueness), nothing involving
+    ConditionalCount/DelegatesUniqueness at all. That's meaningful: it
+    suggests codet5p can tell "this function is a counter" apart from
+    "this function calls a counter and does more," which lexical
+    structurally cannot.
+
+So the picture now: lexical still wins on average-case win rate (88.4 vs
+84.2), but codet5p's failures are narrower, more concentrated in the one
+confusion we've established is likely a correct semantic read rather
+than a flaw, and it's demonstrably more robust to a surface-text
+confound that genuinely fools the lexical baseline. That's a more
+favorable case for codet5p than any earlier round showed — worst-case
+ranking moved from a lexical advantage to a 26-point codet5p advantage
+(81.5% vs 55.6%).
+
+We now have the complete data both backends were missing. I'd suggest
+this is the point to close the loop and write up the final version —
+want me to update semantic_backup_findings.md/.docx with this complete
+10-competency comparison, superseding the earlier partial version?
+
+And this report is updated with all chats.
+
+Create New project in Claude Po: First attempt
+
+Chat: continuing old project work, because the black one stop responding
+
+What is done: Write up the final semantic_backup_findings doc
+(10-competency numbers)
+
+Now let's verify the output visually per the skill's guidance.8 pages.
+Let's check a few key pages visually.Looks clean. Let's check the
+tables/findings pages and the final numbers/recommendation pages.Tables
+render well. Let's check the final-numbers/conclusions/recommendation
+section.This all looks correct and matches the verified numbers. Let's
+check the last two pages (recommendation, limitations, future work).This
+all reads correctly and cleanly. Let's finalize — copy to outputs and
+present.This is the final, complete write-up — 10 competencies, 27
+exemplars, everything re-verified against the live code and real corpus
+in this session rather than just carried forward from transcripts. It
+supersedes both semantic_backup_findings.docx and
+semantic_backup_findings_1.docx.
+
+The story that changed most from the earlier draft: lexical still wins
+on average discriminative power (88.4% vs. 84.2%, a narrower margin than
+before), but codet5p's worst-case advantage went from marginal-or-absent
+to a real 26-point lead (81.5% vs. 55.6%) — because it's specifically
+much more robust to the new DelegatesUniqueness surface-containment
+confound that lexical gets fooled by. The Recommendation section
+reflects that: keep lexical as the default for now, but treat the
+worst-case gap as a real, specific reason to revisit — not a footnote —
+once a couple more DELEGATES-based competencies exist in the registry.
+
+Ready to move on to reconciling this into the main paper whenever you
+are — that companion-paper cross-reference in the finished paper's
+abstract and §7 (Limitations) will need its numbers updated to match
+this final version.
+
+Question 2 conflit:
+
+I want to go to "The new DelegatesUniqueness surface-containment
+confound that lexical gets ". can you try to fix this?
+
+That's a real, fixable issue — not just something to document. The scope
+mismatch is why the confound exists: DelegatesUniqueness's exemplars
+have to contain a full unique_day implementation for audit_registry() to
+verify them (DELEGATES needs the callee in the same parsed tree), but
+that's not what report.py actually embeds at runtime — it only ever
+passes the target function's own text. So the validation has been
+comparing against text a real submission would never be compared
+against.
+
+The fix: keep the full two-function text for verification (audit still
+needs it), but scope exemplars down to just the delegating function's
+own source for embedding/similarity, matching what report.py does in
+production. Let me implement and re-test this.Now let's implement the
+fix: add a scoping helper and apply it wherever exemplars are actually
+embedded for similarity (never for audit_registry, which genuinely needs
+the full text).Now let's add the scoping mechanism, right after the
+registry closes:Now update semantic_backup_score (the production entry
+point) to apply this scoping:Now update validate_semantic_backup.py so
+the held-out test (the one that actually produces the reported win-rate
+numbers) also scopes exemplars before embedding — for both the
+SAME-competency pool and the CROSS-competency pool:Now let's copy the
+fixed files into the working project directory and re-run everything to
+get real, corrected numbers.Audit still clean (unaffected, as intended),
+and the scoping correctly extracts just contains_unique_day — no more
+embedded unique_day counter body. Now let's re-run the actual lexical
+validation with the fix in place.This is a substantial, real fix — not
+just a documentation footnote. Let's confirm it end-to-end and quantify
+the improvement clearly.The fix works — and the improvement is
+substantial, not marginal:
+
+  -----------------------------------------------------------------------
+  metric               before (confound present)     after (scoping fix)
+  -------------------- ----------------------------- --------------------
+  pairwise win rate    88.4%                         90.6%
+
+  worst-case ranking   55.6%                         74.1%
+  -----------------------------------------------------------------------
+
+The DelegatesUniqueness↔ConditionalCount confound is now completely gone
+— zero failures involving DelegatesUniqueness at all (down from 5 of the
+12 total failures). The 7 remaining failures are exactly the
+pre-existing ones from earlier rounds
+(Accumulation/GuardedInput/SelectionStep ambiguity), plus one new, minor
+one: AccumulateThenCount beaten by FunctionalUniqueCheck at 0.700 —
+worth a note but not urgent.
+
+I confirmed this isn't just a validation-script artifact: report.py's
+real generate_report() path picks up the fix automatically (verified
+above — a mangled contains_unique_day correctly gets scored against just
+contains_unique_day-scoped exemplars, not the old inflated comparison).
+No changes needed to report.py itself; the fix lives entirely in
+semantic_backup.py (DELEGATING_FUNCTION + runtime_scoped_exemplar()) and
+validate_semantic_backup.py.
+
+What this means for the story: the confound in Finding 9 wasn't actually
+revealing something fundamental about lexical vs. codet5p — it was an
+artifact of comparing against text no real submission would ever
+produce. Once fixed, lexical's numbers improve on both axes, and there's
+no longer a known asymmetric weakness for lexical to point to. The
+codet5p side of this comparison can't be re-run here (still no
+huggingface.co access), so I can't tell you whether codet5p's numbers
+also improve, stay flat, or lose its now-explained worst-case edge once
+its exemplars are correctly scoped too.
+
+Want me to:
+
+1.  Update the two fixed source files in outputs (semantic_backup.py,
+    validate_semantic_backup.py), and
+
+2.  Regenerate the findings doc with this corrected lexical data
+    (flagging the codet5p side as needing a re-run before the final
+    comparison can be trusted)?
+
+1. Both files updated and diffs confirmed against the originals. Let's
+do one last clean sanity check — re-run both scripts from the outputs
+copies directly (not the working copies) to make sure what's being
+delivered is exactly what was tested.Confirmed clean from the actual
+delivered files.Both files are ready, drop-in compatible with the rest
+of the project (report.py needs no changes — it picks up the fix
+automatically), and re-verified from the exact files being delivered:
+audit still clean, lexical at 90.6%/74.1%.
+
+Whenever you want, I can update the findings doc with this corrected
+data — it'll need the codet5p side flagged as "needs a re-run with the
+same scoping fix before the final comparison is trustworthy," since the
+confound that made codet5p look so much more worst-case-robust than
+lexical may partly or fully disappear once codet5p's exemplars get the
+same correction.
+
+After Result:
+
+This is a great result — and it settles something important that Finding
+10 could only infer indirectly. Let me lay out what actually happened:
+
+  -------------------------------------------------------------------------
+  metric          lexical       lexical      codet5p before  codet5p after
+                  before fix    after fix    fix             fix
+  --------------- ------------- ------------ --------------- --------------
+  pairwise win    88.4%         90.6%        84.2%           84.2%
+  rate                                                       
+
+  worst-case      55.6%         74.1%        81.5%           81.5%
+  ranking                                                    
+  -------------------------------------------------------------------------
+
+codet5p's numbers didn't move at all — not just "close," but numerically
+identical to one decimal place (SAME/CROSS/UNRELATED means barely shift:
+0.695/0.434/0.283 vs. 0.695/0.438/0.288 before). The single weak
+DelegatesUniqueness-related failure it had (0.566) is gone from the
+post-fix list, replaced by an unrelated pre-existing confusion
+(SelectionStep/FindExtremumBuiltin, 0.787) — net failure count
+unchanged.
+
+That's a clean, direct confirmation: codet5p was never meaningfully
+exploiting the surface-containment confound. Its worst-case robustness
+in Finding 10 was a real backend property, not partly an artifact of the
+same bug that was hurting lexical.
+
+The practical consequence is a real shift in the overall picture:
+
+-   Average case: lexical's lead widened, 4.2 → 6.4 points (90.6% vs.
+    84.2%).
+
+-   Worst case: codet5p's lead shrank dramatically, 25.9 → 7.4 points
+    (81.5% vs. 74.1%) — entirely because lexical improved, not because
+    codet5p changed.
+
+That 18.5-point swing was the whole basis for the earlier recommendation
+to take codet5p's worst-case advantage seriously as a "real, specific
+reason to revisit" the default. With the bug actually fixed rather than
+documented, that case is much weaker — codet5p's remaining edge is real
+but modest.
+
+Let me update the findings doc to reflect this properly.Let's update the
+title/background, then insert Finding 11 right after Finding 10, and
+rewrite Final Numbers/Conclusions/Recommendation/Limitations/Open
+Questions.Now let's insert Finding 11 right after Finding 10's caveat
+paragraph, before "Final numbers":Now let's rewrite the Conclusions
+section entirely:Now the Recommendation section:Now Limitations and Open
+Questions:Now let's build and visually verify the updated document.Now 9
+pages (up from 8, due to Finding 11). Let's check the new Finding 11
+section and the Final Numbers/Conclusions pages.The 5-column table
+overflows the page. Let me fix the column widths.Also let's shorten the
+intro line since it references the old, wider table format:Table fits
+now. Let's check the Final Numbers, Conclusions, and Recommendation
+pages.This is accurate and clean. Let's check the last couple of pages
+(Recommendation, Limitations, Open Questions).This is all accurate and
+reads well. Let's check the final page.Everything renders cleanly and
+reads correctly. Let's finalize and deliver.This supersedes v2. The key
+addition is Finding 11, which resolves the open question v2 had left
+hanging — plus updated Final Numbers, Conclusions, Recommendation,
+Limitations, and Open Questions throughout to match.
+
+The headline change from v2: the story is no longer "codet5p has a
+large, mechanistically-explained worst-case advantage." It's now
+"lexical had a fixable bug that was making codet5p look much better on
+worst-case than it actually is relative to lexical — once fixed, lexical
+leads more clearly on average case (6.4 pts, up from 4.2), and codet5p's
+real worst-case edge shrinks to a modest 7.4 points (down from an
+apparent 25.9)." The Recommendation section reflects that directly: keep
+lexical as the default, and the case for it is now stronger, not more
+balanced.
+
+This should now be a solid, closed-loop findings doc — every number in
+it has either been reproduced against the live code in this session or
+comes from a real Colab run reported by you, with the two codet5p runs
+cross-checked against each other.
+
+Whenever you're ready, the main paper reconciliation (its
+companion-paper reference and §7 Limitations) is still waiting to be
+updated to point at this final version.
+
+After running smoke test:
+
+Good — this confirms the scope-fix pipeline works end-to-end on Colab
+exactly as designed. But it also surfaces something worth looking at
+closely.
+
+The moyenne() test is unremarkable and correct: Accumulation scores 1.00
+(right), TopKPattern correctly scores 0.00 (it's an averaging exercise,
+not Top-K), and its semantic-backup similarity is a modest 0.42 — a
+low-similarity "nothing to see here" signal, as expected for genuinely
+unrelated code.
+
+The DelegatesUniqueness check is the interesting one — and it's not the
+reassuring result I'd have expected.
+
+The structural side is exactly right: final=0.00, correctly flagging
+call as missing — the test snippet never calls unique_day at all, so
+there's no delegation happening whatsoever, just "does this month match"
+with no uniqueness check.
+
+But the semantic backup gives it 0.97 similarity — a near-maximal "this
+looks like a known-correct exemplar" signal, for code that's missing the
+entire point of the competency. Comparing the two:
+
+# scoped exemplar #1 (correct — delegates)
+
+for i in possible_birthdays:
+
+if i[0]==month and unique_day(i[1], possible_birthdays):
+
+return True
+
+# the broken test snippet (doesn't delegate at all)
+
+for b in possible_birthdays:
+
+if b[0] == month:
+
+return True
+
+The only difference is one embedded call — and unique_day(i[1],
+possible_birthdays) — but that call is the entire competency. Everything
+else (loop shape, condition structure, return pattern) is nearly
+identical text. That's almost certainly why codet5p rates them 0.97
+similar: it's picking up on overall code shape, and a single embedded
+function call is a small fragment against that backdrop, even though
+structurally it's the whole ballgame.
+
+This isn't a bug in the scope-fix — the fix is doing exactly what it's
+supposed to (comparing against the right, runtime-matched text). It's a
+different, real limitation: for a competency defined by "is one specific
+call present inside a condition," embedding similarity may not reliably
+distinguish "correctly delegates" from "forgot to check uniqueness
+entirely," because that specific omission doesn't change the code's
+surface shape much. A "flag for manual review" signal that fires at 0.97
+on a completely broken submission is a false-positive risk worth knowing
+about before this ships.
+
+One data point isn't enough to conclude this is systematic, though — it
+could be a coincidence of this particular near-miss. Want me to test a
+few more variants (e.g., a submission missing the call entirely with a
+differently-shaped loop, one that calls the wrong function, one that
+calls unique_day but ignores its result) to see whether this is a
+one-off or a consistent pattern worth writing up as a limitation in the
+findings doc?
+
+Question for a limit in embedding similarity: So if I have understood,
+the real limitation is in embedding similarity?
+
+Broadly yes, but let me be precise about what kind of limitation, since
+"embedding similarity is bad" would overclaim it.
+
+It's not that embedding similarity is unreliable in general — the whole
+validation (88–91% pairwise win rate, 74–82% worst-case) shows it does
+separate related from unrelated code well on average. The specific
+limitation is narrower: embeddings tend to capture holistic/topical code
+shape, not the presence or absence of one small, semantically pivotal
+detail — here, a single function call that happens to be the entire
+definition of correctness. Two snippets with nearly identical loop
+shape, condition structure, and return pattern will embed as very
+similar even when the one token sequence that makes them structurally
+different (and unique_day(...)) is entirely missing from one of them.
+The embedding is answering "does this look like the same kind of
+function," not "does this satisfy the specific defining criterion."
+
+This is a known category of weakness in embedding models generally, not
+something specific to codet5p or a bug in the scope-fix — it's the
+code-similarity analogue of sentence embeddings rating "the cat sat on
+the mat" and "the cat did not sit on the mat" as highly similar despite
+the negation flipping the meaning.
+
+Worth noting: this is actually a vindication of the project's existing
+design, not a new problem it exposes. It's exactly why semantic_backup
+is built as advisory-only — flagged for manual review, never
+auto-credited into final_score. This result is a concrete example of why
+that guardrail matters.
+
+One thing I can actually check rather than speculate about: would
+lexical make the same mistake here? A bag-of-tokens method might behave
+better on this specific failure mode, since unique_day( either appears
+in the token bag or it doesn't — that's exactly the kind of signal
+HashingVectorizer can pick up on, unlike codet5p's holistic embedding.
+Want me to run the same broken snippet through the lexical backend and
+see whether it also gets fooled, or whether this is specifically a
+codet5p blind spot?
+
+Good comparison point: lexical gives 0.81 vs. codet5p's 0.97 — lower,
+but still a strong false-positive, not a fix. Let me run a couple more
+variants to see if this is a one-off or a pattern, and to understand why
+lexical still gets fooled despite being bag-of-tokens.This confirms it's
+not a one-off, and lexical isn't meaningfully better here — plus I found
+a second, separate issue while testing.
+
+Lexical results across variants — all similarly high, regardless of
+what's actually wrong:
+
+  ------------------------------------------------------------------------
+  variant                                what's wrong      lexical
+                                                           similarity
+  -------------------------------------- ----------------- ---------------
+  original broken (no call, same loop    missing call      0.81
+  shape)                                 entirely          
+
+  A: no call, different loop shape       missing call      0.78
+  (while+index)                          entirely          
+
+  B: calls a wrong, irrelevant function  wrong call        0.81
+  ------------------------------------------------------------------------
+
+Lexical hovers around 0.78–0.81 no matter which way the delegation is
+broken — it's not actually sensitive to whether the right call is
+present, absent, or replaced with nonsense. So the earlier guess was
+wrong: being bag-of-tokens didn't help here. With the exemplar text this
+short (just contains_unique_day's own ~6–8 lines, post-fix), the
+loop/test/return boilerplate dominates the token vector enough that one
+missing or swapped call barely moves the cosine similarity. Both
+backends are fooled by this failure mode — codet5p just more severely
+(0.97 vs. ~0.80).
+
+Variant C surfaced something different and arguably more important: a
+submission that calls unique_day but never uses its return value —
+
+if b[0] == month:
+
+unique_day(b[1], possible_birthdays) # called, result discarded
+
+return True
+
+— scores final=1.00 from the structural rules themselves, no semantic
+backup involved. DELEGATES only checks that the callee independently
+satisfies its own competency; it never checks whether the caller
+actually branches on the result. This isn't new — the main paper's own
+Limitations section (§7) already flags exactly this: "DELEGATES...
+cannot currently check something like 'delegates correctly, using the
+value that was itself just validated.'" This is a clean, concrete
+demonstration of that documented gap, not a new discovery, but a good
+example to cite.
+
+So there are two distinct things worth writing up:
+
+1.  A genuine embedding-similarity limitation (both backends, worse for
+    codet5p): short, structurally-pivotal call sites get drowned out by
+    surrounding boilerplate — worth adding to the findings doc's
+    Limitations.
+
+2.  A pre-existing, already-documented structural-rule gap, now with a
+    concrete failing example — worth adding as a note/example in the
+    main paper if you want one there.
+
+Want me to add both to the respective documents now?
+
+Now let's insert Finding 12 after Finding 11's closing paragraph, before
+"Final numbers":Now add a Conclusions bullet #7, a Limitations bullet,
+and Open Questions bullets:Now let's build and visually verify.10 pages
+now (up from 9). Let's check the new Finding 12 section.This reads well
+and accurately. Let's spot-check the Conclusions #7 and Limitations/Open
+Questions pages.Good, unchanged pages look intact. Let's check the last
+page for the new Open Questions bullets.Everything reads correctly. The
+findings doc v4 is done. Now let's move to task 2: editing the main
+paper's existing docx to add the concrete example to its Limitations
+section.Found it. Let's view the surrounding XML context to make a
+precise, safe edit.Now let's rezip, validate, and render to visually
+confirm the edit.Validation passed, paragraph count unchanged (single
+paragraph edited in place, not split). Let's render and visually
+confirm.13 pages, edit confirmed in the XML. Let's find and view the
+exact page with this paragraph.Renders exactly as intended — flows
+naturally into the existing paragraph, no formatting artifacts, page
+count barely shifted (176 paragraphs unchanged). Let's finalize both
+deliverables.Both are done:
+
+semantic_backup_findings_v4.docx — adds Finding 12: the call-site blind
+spot both backends share (lexical 0.78–0.81, codet5p 0.97, against
+genuinely broken delegation), plus a distinct structural-rule gap it
+surfaced along the way (a call whose result is discarded still scores
+1.00). Conclusions gained a #7, Limitations and Open Questions got
+matching entries. This is a real, separate caveat from the Finding 11
+fix — worth knowing before this signal is trusted for
+DelegatesUniqueness specifically.
+
+Structural_Competency_Extraction_Paper_v1.docx — a minimal, surgical
+edit (unzip → edit document.xml → rezip, XSD-validated, paragraph count
+unchanged: 176→176) to §7 Limitations, adding one sentence with the
+concrete example right after the existing DELEGATES caveat: a caller
+that invokes the delegate but discards its return value still scores a
+full 1.0. This doesn't change any of the paper's reported numbers — it
+just gives an existing, already-flagged limitation a real, verified
+example instead of leaving it abstract.
+
+Both are consistent with each other and with everything verified earlier
+in this session — nothing here contradicts prior numbers, it only adds a
+new, narrower caveat about one specific competency shape.
+
+files_updates with results after semantic_bkup_validation_and smoke
+test_V2
+
+After semantic_V4_and smoke test_V2.zip
+
+DOCUMENT_INDEX.md : all content of the new project
+
+semantic_backup_findings_v4
+
+Structural_Competency_Extraction_Paper_v1, with only the case of
+delegates in limitations
+
+Next: Serach for improvement for Q2 in the other project.
+
+I think it was treated in an other part of this work.

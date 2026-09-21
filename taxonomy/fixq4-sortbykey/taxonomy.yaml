@@ -1,0 +1,52 @@
+# Taxonomy snapshot — Q3 (duplicate elimination) and Q4 (sort tuples by age) taxonomy correction, as of
+# the "files_Fix_Q4" detector checkpoint (2026-07-28, 04:03 per the zip's own preserved mtimes)
+#
+# Regenerated from ../../provenance/detector-version-log.md, sections "## \`files_Fix_Q4\`..." and
+# "## Enforcement + Q1's LinearSearch" §3 (Q3_Q4_Results_28.docx).
+
+status: current_for_Q3_and_Q4
+supersedes: taxonomy/v1.0.0-baseline (BubbleSortPass as Q4's sole target; SelectionStep unchanged for Q3)
+detector_checkpoint: detectors/fixq4
+
+competencies:
+  - name: SelectionStep
+    question: 3
+    task: "Duplicate elimination (remove_extras)"
+    composition: primitive
+    change: "none — reused as-is; the fix is detector-level (.insert() added to ASSIGN's recognized mutations)"
+    real_coverage:
+      before_fix_pct: 93.6
+      after_fix_pct: 94.0
+    coverage_source: >
+      Q3_Q4_Results_28.docx (conversation-reported), independently corroborated by
+      Structural_Competency_Extraction_Paper.docx's §5.5. NO BATCH SCRIPT OR CSV supplied for either
+      figure. Remaining 6.0% is documented long-tail diversity (list comprehension, ternary-guarded
+      assignment, recursive delegate — "2-3 files each," not chased).
+
+  - name: SortByKey
+    question: 4
+    task: "Sort tuples by age (sort_age)"
+    composition: composite
+    definition: "SortByKey = ANY(BubbleSortPass, TopKPattern)"
+    design_rationale: >
+      Original taxonomy assumed BubbleSortPass alone (matching the reference solution's own strategy) —
+      never checked against real data until this round. Batch validation found it covers only 13.1% of
+      real submissions; the dominant real strategy (64.4%) turned out to be structurally identical to
+      TopKPattern, built entirely for Q5 and transferred with zero new code. Called "the strongest
+      cross-exercise transfer result in the whole project" in the source conversation.
+    real_coverage:
+      bubblesortpass_alone_pct: 13.1
+      topkpattern_alone_pct: 64.4
+      combined_pct: 77.6
+      remaining_unmodeled_pct: 22.4
+    remaining_unmodeled: "recursive partition-based sorting (magus_sort-style); an explicit quicksort delegate"
+    coverage_source: >
+      Q3_Q4_Results_28.docx (conversation-reported) and this checkpoint's own test_real_data.py code comment,
+      independently corroborated by Structural_Competency_Extraction_Paper.docx's §5.5. NO BATCH SCRIPT
+      OR CSV supplied for any of the three percentages.
+    old_versioning_note: >
+      An earlier, guessed version of this repo's VERSIONING.md invented a "TopKPatternExtended" with
+      DELEGATES + a nonexistent "SELF_RECURSIVE" primitive as the Q4/Q5 fix, and fabricated a "79.7%"/
+      "91.9%" figure trail. No such competency, primitive, or figure exists in any real artifact. The
+      real fix is the SortByKey = ANY(...) composition above; TopKPattern's own real fix (level-layering
+      lifting wrappers, unrelated to Q4) lives in detectors/fixq4/.

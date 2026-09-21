@@ -1,0 +1,9 @@
+# Section order and stage_manifest.yaml lookups for Table 5.
+table: "Table 5 — Embedding-based taxonomic discovery and semantic backup layer evaluation"
+sections:
+  - name: "Question 5: manual vs. builtin (FindExtremum)"
+    manifest_key: table5.q5_topk_splits
+  - name: "Question 4: bubblesort vs. topk (SortByKey)"
+    manifest_key: table5.q4_sortbykey_splits
+  - name: "Semantic backup layer: lexical vs. codet5p"
+    manifest_key: table5.semantic_backup

@@ -1,0 +1,277 @@
+04/08/2026
+
+So, I change this in the notebook SHUFFLE_BEFORE_SPLIT =True and re-run
+one time. here are results: confusion matrix [rows=structural label,
+cols=semantic prediction]
+manual builtin novel
+manual 83 15 0
+builtin 6 38 0
+novel 5 0 11
+
+overall accuracy: 0.8354430379746836
+
+precision recall f1-score support
+
+manual 0.88 0.85 0.86 98
+
+builtin 0.72 0.86 0.78 44
+
+novel 1.00 0.69 0.81 16
+
+accuracy 0.84 158
+
+macro avg 0.87 0.80 0.82 158
+weighted avg 0.85 0.84 0.84 158
+
+Good, exactly the kind of check we needed — and it surfaces something
+important, including a direct implication for the number already sitting
+in the paper.
+
+Side-by-side comparison:
+
+  ------------------------------------------------------------------------
+                                              Unshuffled      Shuffled,
+                                              (original)      seed=0
+  ------------------------------------------- --------------- ------------
+  Overall 3-way accuracy                      86.1%           83.5%
+
+  manual precision/recall                     0.92 / 0.86     0.88 / 0.85
+
+  builtin precision/recall                    0.76 / 0.96     0.72 / 0.86
+
+  novel precision/recall                      1.00 / 0.45     1.00 / 0.69
+
+  manual/builtin-only accuracy (the exact     89.1% (131/147) 85.2%
+  number reported in the paper)                               (121/142)
+  ------------------------------------------------------------------------
+
+Two things stand out:
+
+1.  The novel recall swung by 24 points (0.45 → 0.69) just from changing
+    which specific submissions landed in train vs. test. That's a big,
+    real signal — it confirms what we already suspected from the
+    magnitude-effect finding: novel's thin sample (37–48 total) makes
+    its centroid quality genuinely unstable across different training
+    splits, not just weak in an absolute sense.
+
+2.  The manual/builtin number moved too — 89.1% → 85.2%, a 4-point drop
+    on exactly the figure currently published in the paper's §5.5. This
+    is the one that matters most right now: it means that 89.1% wasn't a
+    stable estimate, it was one draw from a distribution. Reporting it
+    alone, without acknowledging that variance, overstates the precision
+    of the claim.
+
+My recommendation: don't just pick whichever number looks better — run
+this across several more seeds (5–10) and report a mean ± spread in the
+paper instead of a single decimal. That's a stronger, more honest claim
+("embedding-based classification agreed with the structural label at
+86.7% ± 2.8% across 10 random splits" or whatever the real numbers turn
+out to be) than either single run alone.
+
+Want me to:
+
+1.  Give you a small loop to add to the notebook that runs this across N
+    seeds and aggregates the manual/builtin accuracy automatically, and
+
+2.  Once you have those numbers, update §5.5 of the paper to report the
+    mean/spread instead of the current single 89.1% figure?
+
+Prompt: ok do the first one
+
+Here's the caching + multi-seed loop. To avoid re-embedding all 526
+files N times (expensive and pointless — the embeddings themselves don't
+depend on the split), I embed everything once upfront, then just
+re-shuffle/re-split/re-classify per seed using the cached vectors.
+
+Cell A — embed everything once (run this before the loop):
+
+# Pre-embed every file once. Embeddings don't depend on the train/test
+
+# split, so there's no need to recompute them per seed.
+
+embedding_cache = {}
+
+for fname in labeled["file"]:
+
+src = read_src(fname)
+
+if src is not None:
+
+embedding_cache[fname] = codebert_embed(src)
+
+print(f"cached {len(embedding_cache)} embeddings out of {len(labeled)}
+files")
+
+Cell B — the multi-seed loop:
+
+import numpy as np
+
+from sklearn.metrics import accuracy_score
+
+SEEDS = list(range(10)) # 10 runs; bump this up if you want tighter
+estimates
+
+labels_order = ["manual", "builtin", "novel"]
+
+per_seed_results = []
+
+for seed in SEEDS:
+
+shuffled = labeled.sample(frac=1,
+random_state=seed).reset_index(drop=True)
+
+split_point = int(len(shuffled) * 0.7)
+
+train_df_s = shuffled.iloc[:split_point]
+
+test_df_s = shuffled.iloc[split_point:]
+
+# Build centroids from cached embeddings -- no re-embedding
+
+centroids_s = {}
+
+for label in labels_order:
+
+files = train_df_s[train_df_s["structural_label"] ==
+label]["file"].tolist()
+
+vecs = [embedding_cache[f] for f in files if f in embedding_cache]
+
+centroids_s[label] = np.mean(vecs, axis=0)
+
+# Classify test set by nearest centroid
+
+rows = []
+
+for _, row in test_df_s.iterrows():
+
+f = row["file"]
+
+if f not in embedding_cache:
+
+continue
+
+emb = embedding_cache[f]
+
+sims = {label: cosine_sim(emb, c) for label, c in centroids_s.items()}
+
+predicted = max(sims, key=sims.get)
+
+rows.append({"file": f, "structural_label": row["structural_label"],
+"semantic_predicted": predicted})
+
+results_s = pd.DataFrame(rows)
+
+# Full 3-way accuracy
+
+acc_3way = accuracy_score(results_s["structural_label"],
+results_s["semantic_predicted"])
+
+# Manual/builtin-only accuracy -- the figure actually reported in the
+paper
+
+mb_only = results_s[results_s["structural_label"].isin(["manual",
+"builtin"])]
+
+acc_mb = accuracy_score(mb_only["structural_label"],
+mb_only["semantic_predicted"])
+
+# Novel recall specifically, since that's the unstable one
+
+novel_rows = results_s[results_s["structural_label"] == "novel"]
+
+novel_recall = (novel_rows["semantic_predicted"] == "novel").mean() if
+len(novel_rows) else float("nan")
+
+per_seed_results.append({
+
+"seed": seed,
+
+"acc_3way": acc_3way,
+
+"acc_manual_builtin": acc_mb,
+
+"novel_recall": novel_recall,
+
+"n_test": len(results_s),
+
+"n_novel_test": len(novel_rows),
+
+})
+
+summary_df = pd.DataFrame(per_seed_results)
+
+print(summary_df)
+
+print()
+
+print(f"3-way accuracy: mean={summary_df['acc_3way'].mean():.3f}
+std={summary_df['acc_3way'].std():.3f}")
+
+print(f"manual/builtin acc:
+mean={summary_df['acc_manual_builtin'].mean():.3f}
+std={summary_df['acc_manual_builtin'].std():.3f}")
+
+print(f"novel recall: mean={summary_df['novel_recall'].mean():.3f}
+std={summary_df['novel_recall'].std():.3f}")
+
+A couple of things to expect / watch for:
+
+-   Seed 0 in this loop should reproduce almost exactly the 83.5%/85.2%
+    numbers you just got by hand (small floating-point differences
+    possible depending on .sample()'s internal RNG vs. however you
+    shuffled before, but should be very close) — worth a quick sanity
+    check that it does.
+
+-   With only 10 seeds and novel's thin test size (~11-16 per split),
+    the novel_recall std will likely be large relative to its mean —
+    that's expected and itself informative, not a bug.
+
+-   If you want tighter estimates for the paper, bump SEEDS to 30 or 50
+    — embedding is already cached, so the loop itself is cheap; only the
+    centroid-averaging and classification math repeats.
+
+Run Cell A once, then Cell B, and send me the printed summary_df plus
+the three mean/std lines — that's what goes into the paper's §5.5
+update.
+
+where Exactly I have to put cell A and B in the notebook?
+
+Add them as new cells at the very end of the notebook, after the last
+cell (§10, "Save results") — not in the middle of the existing flow.
+Here's why: Cell A needs labeled (created in §5, the split cell) and
+read_src (defined in §6, the centroid-building cell), and Cell B needs
+everything from Cell A plus codebert_embed/cosine_sim (from §3). By the
+time you reach the end of the notebook, all of that already exists — so
+appending avoids disturbing anything upstream, including whatever local
+fixes you've already made (like the corrected FOLDER path).
+
+Concretely:
+
+1.  Scroll to the bottom, past the existing §10 "Save results" cell (the
+    one with results_df.to_csv(...) and files.download(...))
+
+2.  Add a new markdown cell:
+
+3.  ## 11. Multi-seed robustness checkRuns the same classification
+    across several random train/test splitsinstead of one, to check how
+    stable the manual/builtin agreement figureactually is -- this is
+    what goes into the paper instead of a single run.
+
+4.  Add Cell A as a new code cell right after that
+
+5.  Add Cell B as a new code cell right after Cell A
+
+Two things to double check once it's in place:
+
+-   Cell A's for fname in labeled["file"]: loop reuses read_src, which
+    in your version already points at the corrected folder — no changes
+    needed there, it'll just work.
+
+-   Run Cell A once (it'll take a bit, embedding all ~526 files), then
+    run Cell B — Cell B is fast since it only reuses the cache.
+
+If you'd rather I just hand you the whole notebook with these appended
+so you don't have to place them yourself, say so and I'll add them to a
+copy and give you the .ipynb — otherwise this placement should drop in
+cleanly on top of what you've already got.

@@ -1,0 +1,57 @@
+# Taxonomy snapshot — baseline, as of the "V1.0.0" detector checkpoint (2026-07-18)
+#
+# Regenerated from ../../provenance/detector-version-log.md, section "## V1.0.0". Every field below is
+# either read directly from the registered Competency objects in that checkpoint's test_real_data.py,
+# or the exercise name is Sonia's own. No coverage percentages exist yet — this checkpoint's own
+# validation scope was 2-4 spot-tested real files per question, not full-corpus batch validation.
+
+status: superseded
+superseded_by: taxonomy/q2-3rd-strategy-uniquecheck (Q2), taxonomy/enforcement-linearsearch (Q1), taxonomy/fixq4-sortbykey (Q3/Q4)
+detector_checkpoint: detectors/v1.0.0
+
+competencies:
+  - name: GuardedInput
+    question: 1
+    task: "Sequential search"
+    composition: primitive
+    notes: >
+      Treated as structurally identical to search at this checkpoint. No independent LinearSearch
+      competency exists yet — added at the enforcement checkpoint (2026-07-28), deliberately as a separate
+      registration rather than a wrapper, to avoid encoding a false relationship (see that checkpoint's
+      taxonomy.yaml and its own file's comment).
+
+  - name: ConditionalCount
+    question: 2
+    task: "Unique day / unique month (occurrence counting)"
+    composition: primitive
+    notes: >
+      Single strategy only (explicit counter). Real coverage against the corpus was not measured yet.
+      Corrected at q2-3rd-strategy (2026-07-28) to UniqueCheck = ANY of three genuinely distinct strategies.
+
+  - name: SelectionStep
+    question: 3
+    task: "Duplicate elimination (remove_extras)"
+    composition: primitive
+    notes: >
+      Reused as-is at every later checkpoint too — Q3 never got a dedicated advanced competency; the only
+      Q3-relevant fix anywhere in this project is a detector-level ASSIGN extension (.insert(), at
+      fixq4), not a taxonomy change.
+
+  - name: BubbleSortPass
+    question: 4
+    task: "Sort tuples by age (sort_age)"
+    composition: composite
+    notes: >
+      Assumed as the sole Q4 target at this checkpoint, matching the reference solution's own strategy.
+      This assumption was never checked against real data until 2026-07-28 (files_Fix_Q4 / Q3_Q4_Results_28
+      .docx), where batch validation found it alone covers only 13.1% of real submissions — see
+      taxonomy/fixq4-sortbykey/taxonomy.yaml for the correction.
+
+  - name: TopKPattern
+    question: 5
+    task: "Top-K (repeated extremum extraction)"
+    composition: composite
+    definition: "TopKPattern = ALL(loop: LOOP, select: FindExtremum), NESTED(loop, select)"
+    notes: >
+      No explicit removal check yet — this is the pre-"missing-removal-bug" (#12) definition, fixed at the
+      reporting-batch checkpoint (~2026-07-21) by adding a required remove slot.

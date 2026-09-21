@@ -1,0 +1,557 @@
+29/07/2026
+
+How I can address the semantic-similarity backup signal ?
+
+Right now the semantic layer is in a specific, well-documented state:
+architecturally complete, but empirically unvalidated for two concrete
+reasons — real CodeBERT inference was blocked in the sandbox (confirmed
+via a 403, host_not_allowed, not assumed), and the stand-in used to test
+the plumbing (_stub_embed, a bag-of-AST-tokens cosine similarity) was
+directly shown to have no discriminative power — a related and an
+unrelated function scored within 0.02 of each other. "Addressing it"
+really means closing that gap with the same validation discipline this
+paper just used for the structural layer. Here's a concrete path:
+
+1. Get real embeddings running outside the sandbox
+semantic_backup.py already has _codebert_embed written correctly —
+switching backend="codebert" is a one-line change per the code's own
+docstring. You just need it run somewhere with Hugging Face access (your
+local machine, a Colab notebook, anywhere outbound network isn't
+blocked). That single run is what turns "architecturally sound" into
+"validated."
+
+2. Fix the exemplar registry — it's currently the weakest link
+EXEMPLARS only has 2–3 hand-written snippets per competency, seeded to
+test wiring, not to provide real coverage. Pull real reference exemplars
+straight from the Refactory correct/ folders you already have (a handful
+of diverse correct submissions per competency, not just one canonical
+style) — that's a much more honest test of whether the model
+generalizes.
+
+3. Build the actual test set: submissions that score 0 structurally
+This is the part that matters most. Filter your Refactory batch results
+for submissions that are test-suite-correct but score 0 (or near-0) on
+every relevant AST competency — these are the genuine "structurally
+novel but correct" cases the semantic layer exists to catch (the
+functools.reduce-based FindExtremum case is the paradigm example already
+named in the code). If real CodeBERT similarity is meaningfully higher
+for these than for genuinely wrong/unrelated code, that's your first
+real signal.
+
+4. Calibrate the threshold instead of assuming 0.5
+semantic_threshold=0.5 is currently a placeholder. Once you have real
+similarity scores on a labeled set (novel-correct vs. genuinely-wrong,
+both scoring 0 structurally), run a precision/recall or ROC sweep to
+pick a defensible cutoff — and report that sweep, not just the final
+number.
+
+5. Establish a baseline to beat
+The stub already gives you a built-in negative control: if real CodeBERT
+can't separate related from unrelated code meaningfully better than the
+stub did, that's a valid (if disappointing) result worth publishing
+honestly, in the same spirit as this paper's Table 4. Report it either
+way.
+
+6. Mirror this paper's structure for the companion piece
+Same shape: methodology → validation against real data → quantified
+findings → limitations, with the semantic layer's role stated precisely
+as "unverified signal for manual review, never folded into final_score"
+— that framing is already in semantic_backup.py's docstring and is worth
+keeping verbatim as the paper's core design principle.
+
+Want me to draft an outline or a validation-harness script (the batch
+runner + labeled test-set builder for step 3) so it's ready to run the
+moment you have real CodeBERT access?
+
+Prompt 2: I want to create a project in colab to implement and use
+embeddings, so how I have to do this?
+
+Got it — a Colab notebook, not a Claude project. Since this needs real
+code execution against real GPU/network access (exactly what was blocked
+in the sandbox), I'll build you a ready-to-run notebook rather than just
+describing steps — you can upload it straight into Colab.Let's validate
+the notebook JSON is well-formed and check it opens cleanly.Well-formed.
+Let's move it to outputs.How to use it:
+
+1.  Go to colab.research.google.com → File → Upload notebook → select
+    this .ipynb
+
+2.  (Optional but recommended) Runtime → Change runtime type → GPU,
+    though codebert-base runs fine on CPU for short snippets too
+
+3.  Run cells top to bottom — Cell 2 will prompt you to upload
+    competency.py, semantic_backup.py, and your batch CSV (e.g.
+    topk_report.csv); if you'd rather not re-upload each session, use
+    the commented-out Drive-mount cell instead
+
+What it actually does, matching the plan from before:
+
+-   §1–3: confirms GPU/CPU, loads real microsoft/codebert-base (the
+    exact swap semantic_backup.py already anticipated with
+    backend="codebert"), and runs a sanity check that related code
+    scores higher than unrelated code
+
+-   §4: builds a real exemplar registry from actual Refactory correct/
+    submissions instead of the 2–3 hand-written stubs
+
+-   §5–6: builds the test set that actually matters — test-suite-correct
+    submissions that scored 0 structurally, compared against
+    genuinely-wrong submissions that also scored 0 structurally
+
+-   §7: an AUC/ROC threshold sweep instead of the placeholder 0.5
+
+-   §8: exports a CSV you can drop straight into the companion paper's
+    results
+
+One thing to flag: cells 4–6 have placeholder paths
+(refactory/data/question_5/code/correct/*.py, topk_report.csv column
+names) — you'll need to point those at wherever your actual data lands
+in the Colab session once you upload or mount it.
+
+Prompt 3:
+
+In colab, a cell will prompt to upload competency.py,
+semantic_backup.py, and the batch CSV (e.g. topk_report.csv); I would
+not re-upload each session, How to
+
+mount Google Drive instead of re-uploading every session
+
+Let's set this up properly — I'll rework the notebook so Drive-mounting
+is the default path, with one folder structure you set up once.Let's
+validate the notebook JSON and check the key cells render
+correctly.Confirm the path substitutions actually landed correctly:All
+wired correctly. Let's finalize.I updated the notebook so Drive-mounting
+is now the primary path, not a commented-out afterthought. Here's what
+to do:
+
+One-time setup, in Google Drive itself (not Colab):
+
+1.  In My Drive, create a folder — e.g. competency_extraction/
+
+2.  Put your files in it like this:
+
+competency_extraction/
+
+competency.py
+
+semantic_backup.py
+
+topk_report.csv
+
+refactory/
+
+data/
+
+question_5/code/correct/*.py
+
+question_5/code/wrong/*.py
+
+...
+
+Every session after that, in the notebook:
+
+-   Run Cell 4 (the new mount cell). First time ever, it'll pop up a
+    Google auth flow — approve it. Every session after, it just mounts,
+    no re-auth, no re-upload.
+
+-   It sets one variable, PROJECT_DIR =
+    '/content/drive/MyDrive/competency_extraction' — adjust that path if
+    you named your folder differently.
+
+What changed under the hood: every downstream cell that used to
+reference bare local paths (topk_report.csv, refactory/data/...) now
+reads from f"{PROJECT_DIR}/..." instead — so it all resolves against
+your Drive folder automatically. The results file at the end also saves
+back into PROJECT_DIR, so your validation output persists in Drive too,
+not just as a one-off download.
+
+The old upload flow is still there (§2, Option B) but now clearly marked
+as the fallback if you'd rather not set up Drive.
+
+One thing worth double-checking once you've got real data in there: the
+exemplar-loading and scoring cells currently only wire up FindExtremum
+(Question 5) and Accumulation (Question 2) as examples — add entries for
+SortByKey, SelectionStep, or whichever competencies you actually want
+semantic backup for, following the same pattern.
+
+Prompt4:
+
+I have run cell 3, here are results: related vs related:
+0.9579190015792847 related vs unrelated: 0.9641265273094177. Why ?
+
+This isn't a bug in your setup — it's a well-known property of raw,
+non-fine-tuned transformer embeddings, and it's worth understanding
+before we fix it. Let me verify the best fix with a quick search rather
+than guess a model name.This is a real, reproducible, and
+well-documented issue — not something specific to your data. Let me
+explain and give you a fix.
+
+Why this happens
+
+codebert-base was trained with masked-language-modeling and
+replaced-token-detection objectives — not with any objective that makes
+cosine similarity between pooled embeddings meaningful. When you
+mean-pool raw transformer output like this, the resulting vectors don't
+spread out across the embedding space the way you'd want; instead they
+collapse into a narrow cone, so almost everything ends up with high
+cosine similarity to almost everything else, regardless of actual
+content. This is called anisotropy, and it's a documented property of
+BERT-family models used this way — there's literally an open issue on
+the microsoft/CodeBERT GitHub repo where someone hits this exact symptom
+(very high, non-discriminative cosine similarity for randomly chosen
+code pairs) using essentially the same pipeline as your notebook.
+
+So — ironically — you've now reproduced the same finding as the stub
+embedding in the original sandboxed version (no discriminative power),
+but for a different, legitimate reason: it's not that CodeBERT is bad at
+understanding code, it's that raw mean-pooled CodeBERT embeddings aren't
+a similarity metric.
+
+Let me find the right fix rather than guess a model name.The fix: switch
+to an embedding model actually trained with a contrastive objective for
+code similarity, not raw codebert-base. Confirmed real option:
+jinaai/jina-embeddings-v2-base-code — purpose-built for code-to-code
+similarity via sentence-transformers, supports Python among ~30
+languages, 8192 token context. Let me update the notebook to use it as
+the default, with codebert-base kept as a clearly-labeled
+fallback.Summary of what changed: Cell 8 (the embedding cell) now
+installs sentence-transformers and defaults to
+jinaai/jina-embeddings-v2-base-code instead of raw codebert-base. Same
+function names (codebert_embed, cosine_sim) so nothing downstream in the
+notebook needs to change — just re-run from that cell onward.
+
+Re-run cell 8 and you should see a real gap this time (something like
+related≈0.6–0.8 vs unrelated≈0.1–0.3, roughly — exact numbers will vary,
+but the point is a visible separation, not 0.96/0.96).
+
+I kept raw codebert-base in as a commented-out block at the bottom of
+that cell, for two reasons: (1) if you specifically want to report a
+CodeBERT result in the companion paper for comparability with related
+work, and (2) if you'd rather fix anisotropy via postprocessing
+(mean-centering / whitening the embeddings) instead of switching models
+entirely — that's a legitimate alternative documented in the literature,
+just more work to implement than swapping to a model already trained for
+this.
+
+One thing to flag for the paper itself: if you end up reporting both —
+raw CodeBERT's failure and jina's success — that's actually a nice,
+honest methodological finding in the same spirit as Table 4: "naive use
+of a pretrained code model doesn't give you similarity for free; the
+embedding objective matters." Worth a sentence in the semantic-layer
+companion paper's own findings section.
+
+Prompt 5: what if I use :prefix = "<s> <encoder_only> </s> "
+
+That prefix is specific to Salesforce's codet5p-110m-embedding — a
+different (and good) choice, purpose-built for exactly this. Let me pull
+the exact usage pattern from the model card rather than guess.Good catch
+to check — but that specific prefix isn't part of the official usage for
+the model you're likely trying. Let me clarify precisely.
+
+Where that prefix comes from: CodeT5+'s general checkpoints
+(codet5p-220m, codet5p-770m, etc.) are multi-mode — they can act as
+encoder-only, decoder-only, or full encoder-decoder, and you select the
+mode with special tokens like <encoder_only>. That's a real mechanism,
+but it applies to the general checkpoints.
+
+If you're using Salesforce/codet5p-110m-embedding (the dedicated
+embedding checkpoint), you don't need it. I just pulled the model card
+directly, and its official usage is simpler — no mode prefix at all:
+
+from transformers import AutoModel, AutoTokenizer
+
+checkpoint = "Salesforce/codet5p-110m-embedding"
+
+tokenizer = AutoTokenizer.from_pretrained(checkpoint,
+trust_remote_code=True)
+
+model = AutoModel.from_pretrained(checkpoint,
+trust_remote_code=True).to(device)
+
+inputs = tokenizer.encode(code, return_tensors="pt").to(device)
+
+embedding = model(inputs)[0] # already normalized: norm == 1.0
+
+This checkpoint is just the CodeT5+ encoder + a projection layer, baked
+into a fixed embedding model via custom_code — the mode-selection is
+already handled internally. Adding <s> <encoder_only> </s> on top would
+just get tokenized as literal text (it's not a special token in this
+checkpoint's vocabulary) and would likely hurt, not help, your
+embeddings.
+
+It's actually a strong pick — it reports 74.23% average retrieval
+accuracy across 6 languages (incl. Python) on CodeXGLUE code-search
+benchmarks, which is citable in your companion paper, and at 110M params
+it's much lighter than jina-embeddings-v2-base-code. Want me to swap it
+in as the notebook's default (keeping jina as the labeled alternative)?
+
+OK, just make the swap, don't keep jina
+
+Clean. Let's also drop the leftover !pip install sentence-transformers
+line if it landed anywhere else, and check no stray jina references
+remain.Clean — no leftover references. Finalizing.Done. Cell 8 now uses
+Salesforce/codet5p-110m-embedding exclusively, via its official
+(no-prefix) usage pattern, with !pip install transformers already
+covered by the setup cell earlier. No sentence-transformers, no jina
+references left anywhere in the notebook. Function names
+(codebert_embed, cosine_sim) stayed the same, so everything downstream —
+exemplar registry, batch scoring, ROC sweep — still works without
+further edits. Re-run from cell 8 onward.
+
+File= “Semantic backup validation.IPYNB “ from 30/07.
+
+Prompt: the result of cell5 is: novel-correct candidates: 43
+genuinely-wrong comparison group: 5
+
+Good, those numbers make sense — but one of them is a real limitation
+worth pausing on before you run cell 6/7.
+
+What this means:
+
+-   43 novel-correct: submissions that pass the test suite but scored 0
+    on FindExtremum — meaning they used neither the manual comparison
+    loop nor max()/min() (recall FindExtremum = ANY(manual, builtin), so
+    this already covers both known strategies). These 43 are genuinely
+    novel implementations — functools.reduce, sorted()[-1], heapq, or
+    something else entirely. This is exactly the target population the
+    semantic layer exists to catch — good sample size for that.
+
+-   5 genuinely-wrong: makes sense to be small — per the paper's own
+    finding, most wrong-labeled submissions still score 1.0 on the
+    structural competencies (they get the pattern right, fail on an edge
+    case elsewhere). Only 5 managed to be wrong and miss FindExtremum
+    entirely.
+
+The problem: n=5 is too small to compute a meaningful ROC/AUC in cell 7.
+With only 5 negative examples, the curve will be dominated by noise — a
+single unusual embedding among those 5 could swing the AUC by 0.1–0.2,
+and it won't tell you anything reliable about the real separation
+between "novel strategy" and "actually wrong."
+
+Two ways to fix this before moving on — want me to implement one in the
+notebook?
+
+1.  Broaden the wrong-group filter: drop the FindExtremum_final == 0
+    requirement for the wrong group and just use all wrong-labeled
+    submissions as the negative comparison. Rationale: you're not
+    testing "wrong submissions that also miss this specific competency,"
+    you're testing "does similarity meaningfully separate
+    genuinely-novel-correct code from genuinely-incorrect code" — the
+    wrong group doesn't need the same structural-miss constraint the
+    novel-correct group does.
+
+2.  Pool across exercises: pull the wrong group from other Refactory
+    questions too (Q1–Q4), not just Q5 — gives you a much larger, more
+    diverse negative set, at the cost of it being a slightly different
+    kind of comparison (cross-exercise wrong code vs. same-exercise
+    wrong code).
+
+Option 1 is the more defensible fix and less work — want me to update
+cell 5 that way?
+
+ok, use option 1, and give me the content of the fix, so I can change
+the notebook by hand.
+
+Here's the updated cell 5 content — just the genuinely_wrong filter
+changes (drops the _final == 0 condition, keeps only the label ==
+"wrong" check):
+
+import pandas as pd
+
+report = pd.read_csv(f"{PROJECT_DIR}/topk_report.csv") # or whichever
+batch CSV you uploaded
+
+COMPETENCY = "FindExtremum" # adjust to the column you're validating
+
+novel_correct = report[
+
+(report["label"] == "correct") &
+
+(report[f"{COMPETENCY}_final"] == 0)
+
+]
+
+# Option 1: broadened comparison group -- all wrong-labeled submissions,
+
+# not just the ones that also miss this specific competency. The
+question
+
+# being tested is "does similarity separate novel-but-correct code from
+
+# genuinely-incorrect code", not "...from incorrect code that also
+happens
+
+# to structurally miss this one competency" -- the latter constraint
+just
+
+# starves the sample (n=5) without adding anything relevant to what's
+being
+
+# measured.
+
+genuinely_wrong = report[
+
+report["label"] == "wrong"
+
+]
+
+print(f"novel-correct candidates: {len(novel_correct)}")
+
+print(f"genuinely-wrong comparison group: {len(genuinely_wrong)}")
+
+That's the only change — one line dropped (&
+(report[f"{COMPETENCY}_final"] == 0)) and a comment explaining why.
+Everything downstream (cell 6's score_group calls, cell 7's ROC sweep)
+reads from these two dataframes as before, so no other cells need
+touching.
+
+Let me know what n you get for genuinely_wrong now — with 108
+wrong-labeled Q5 submissions total, it should be comfortably larger.
+
+yes it is 108
+
+108 out of 108 — makes sense, since dropping the structural-miss filter
+just returns the full wrong-labeled group for Q5. That's a solid sample
+size now: 43 vs. 108 is enough for cell 7's ROC/AUC to mean something
+real rather than being dominated by noise from a handful of points.
+
+You're set to move on to cell 6 (scoring both groups) and cell 7 (the
+ROC sweep). A couple of things worth knowing before you run them:
+
+-   Cell 6 will take longer now — 151 embeddings instead of 48, but
+    still fast on CPU for snippets this short (a few seconds to a minute
+    or so, not a real bottleneck).
+
+-   Watch for the same path-mismatch risk cell 6 already guards against:
+    it does try/except FileNotFoundError per file and silently skips
+    misses — so if n in your printed means/stds ends up noticeably less
+    than 43/108, some file paths aren't resolving (double check
+    folder_prefix matches where your correct//wrong/ .py files actually
+    live under PROJECT_DIR).
+
+-   When you get the AUC in cell 7, don't just eyeball it as "good" or
+    "bad" — report it exactly as computed, the same honesty standard as
+    Table 4 in the paper. An AUC near 0.5 is a legitimate, publishable
+    negative result (real similarity, on this competency, doesn't
+    separate novel-correct from wrong); anything meaningfully above 0.5
+    is your actual evidence the semantic layer adds signal beyond the
+    structural one.
+
+Run cell 6, then cell 7, and send me the mean/std output plus the AUC —
+I'll help you read what it actually means for the companion paper either
+way.
+
+Prompt: This is the result of cell6:
+
+novel-correct: mean=0.851 std=0.086 n=43
+
+genuinely-wrong: mean=0.930 std=0.027 n=108
+
+That result is a red flag worth stopping on before running cell 7 — not
+because the embeddings failed, but because I think Option 1 introduced a
+hidden confound. Let me walk through why, then give you the fix.
+
+What's likely happening: the paper's own finding (§5.3) is that most
+wrong-labeled submissions in this dataset still score 1.0 on the
+structural competency — they implement the pattern correctly and fail
+the test suite on an unrelated edge case. When we broadened
+genuinely_wrong to "all wrong-labeled" (dropping the FindExtremum_final
+== 0 filter), that group became dominated by submissions that do
+structurally implement FindExtremum correctly — meaning their code is
+genuinely, syntactically close to your exemplars. That would explain
+exactly what you're seeing: high mean (0.930), very tight std (0.027) —
+a large chunk of near-identical, textbook-correct implementations
+pulling the average up. Meanwhile novel_correct (0.851, std 0.086) is
+lower and more spread out because it's deliberately the diverse,
+non-standard implementations.
+
+In other words: the comparison right now isn't testing "novel-correct
+vs. actually-wrong" — it's mostly testing "unusual-but-correct vs.
+textbook-correct-but-fails-elsewhere," which both should look different
+from each other even though neither is a real negative. The AUC in cell
+7 would likely come out backwards or muddled, and it wouldn't mean what
+we want it to mean.
+
+The fix: pull true negatives from different exercises entirely — e.g.,
+Q1 (sequential search) or Q3 (duplicate elimination) submissions,
+correct or wrong, don't matter — since none of them are attempting to
+find an extremum at all. That's an unambiguous negative with no
+contamination risk, and gives you plenty of volume.
+
+Updated cell 5:
+
+import pandas as pd
+
+report = pd.read_csv(f"{PROJECT_DIR}/topk_report.csv")
+
+COMPETENCY = "FindExtremum"
+
+novel_correct = report[
+
+(report["label"] == "correct") &
+
+(report[f"{COMPETENCY}_final"] == 0)
+
+]
+
+# True negatives from an unrelated exercise instead of same-exercise
+"wrong"
+
+# submissions -- avoids the contamination risk where "wrong" mostly
+means
+
+# "correct pattern, failed elsewhere" (see paper Section 5.3). Adjust
+the
+
+# CSV/columns if your unrelated-exercise report is a separate file.
+
+other_exercise_report =
+pd.read_csv(f"{PROJECT_DIR}/question_1_report.csv") # e.g. sequential
+search
+
+genuinely_wrong = other_exercise_report # every row here is a true
+negative for FindExtremum
+
+print(f"novel-correct candidates: {len(novel_correct)}")
+
+print(f"unrelated-exercise comparison group: {len(genuinely_wrong)}")
+
+You'll need a batch report for a second exercise (run batch_report.py
+against Q1 or Q3 the same way you did for Q5, if you haven't already).
+Let me know once you have n for both groups and we'll move to cell 6.
+
+31/07
+
+Prompt: can you summarize in a clear document what's the role of this
+semantic backup, and what is the relation with the first part with AST
+
+The document covers seven things, in order:
+
+1.  What the AST layer already does — and its one named limitation
+    (can't recognize strategies no one wrote a rule for)
+
+2.  What the semantic layer is for — specifically catching that gap, via
+    embedding similarity against known-correct exemplars
+
+3.  The one rule that defines the relationship: semantic similarity
+    never touches final_score — it's a separate, labeled, unverified
+    flag only, and I explain why that boundary matters (it's what keeps
+    the structural layer's inspectability intact)
+
+4.  A side-by-side table contrasting the two layers directly — input,
+    output, determinism, inspectability, role, validation status
+
+5.  Why the semantic layer isn't in the published AST paper — scope
+    discipline plus the honest fact that it wasn't validated yet
+
+6.  Where the Colab validation work stands right now — the anisotropy
+    finding, the switch to codet5p-110m-embedding, and the
+    contaminated-comparison-group issue we just caught and are fixing
+
+7.  A single-sentence summary of the relationship, for reuse as a thesis
+    statement in the companion paper's own intro
+
+It's written as a standalone reference — safe to hand to someone else (a
+co-author, an advisor) without needing the rest of this conversation as
+context. Let me know if you'd rather have it as a .docx to match the
+other deliverables, or if there's a section you want expanded or cut.

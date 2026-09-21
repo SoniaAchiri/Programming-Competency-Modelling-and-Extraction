@@ -1,0 +1,101 @@
+Now, how I can do a Batch validation at full scale, for the remaining
+tasks of Refactory dataset (Q1 to Q4)?
+
+Good — this reuses the exact same batch_report.py machinery that
+produced topk_report.csv for Q5, just pointed at the other four folders
+with the right competency IDs and function names. Let me give you a
+script that does all four in one pass.
+
+A few things I need to be upfront about, since I don't have your actual
+Refactory dataset files in this environment (only the project code, not
+the submission data) — I can write and validate this script, but I can't
+run it myself; you'll run it wherever your Refactory data/ folder
+actually lives.Confirmed: unique_day (Q2) is a real, verified function
+name straight from the code. remove_extras (Q3) and sort_age (Q4) I only
+have from the paper's prose — accurate as far as I know, but not
+independently confirmed against actual code in what I have access to.
+Q1's function name isn't stated anywhere I can see — q1_competencies.py
+validates against the whole file, not a scoped function, so it may not
+even need one. I'll flag all of this clearly in the script rather than
+guess.How to use it:
+
+1.  Drop it into the same directory as competency.py, batch_report.py,
+    test_real_data.py, q1_competencies.py, q2_competencies.py,
+    ex2_3_4_competencies.py (wherever those already live in your setup)
+
+2.  Set REFACTORY_ROOT to point at your actual data/ folder
+
+3.  Run it: python run_q1_q4_batch_validation.py
+
+It reuses batch_report.py's existing process_folders() exactly the way
+it was already used for Q5 — one CSV per question, in the same
+{competency}_final / {competency}_missing column format as
+topk_report.csv, so anything you already built to read that format
+(including the Colab notebooks) should work on these too with minimal
+changes.
+
+Before you trust the output, please confirm the three things I flagged
+in the script's docstring and inline comments:
+
+1.  Q2's unique_day — this one I actually verified against your code
+    (pw01_competencies.py and q2_competencies.py both define and resolve
+    against a function literally named unique_day). Safe to trust.
+
+2.  Q3's remove_extras and Q4's sort_age — these came from the paper's
+    prose, not from re-checking actual source files against them here.
+    Almost certainly right (they were used to produce the numbers
+    already in the paper), but worth a quick sanity check — open 2–3
+    real Q3/Q4 files and confirm the function name matches.
+
+3.  Q1 — I genuinely don't have this one. q1_competencies.py, as I have
+    it, validates LinearSearch against the whole file, not a scoped
+    function — meaning either Q1 submissions are simple enough that
+    whole-file resolution was fine, or the function name was just never
+    recorded anywhere I can see. I left function_name=None for Q1
+    (whole-file, matching what the original script actually did) rather
+    than guess a name — if you know the real function name, add it in;
+    otherwise this reproduces the same scope the original Q1 check used.
+
+One more gap to flag: the RUNS list's target_ids for each question are
+my best reconstruction from what each question's paper section says was
+validated (GuardedInput/LinearSearch for Q1,
+ConditionalCount/UniqueCheck/AccumulateThenCount for Q2, SelectionStep
+for Q3, the SortByKey trio for Q4) — but I don't have
+q2_competencies.py's full FunctionalUniqueCheck registration confirmed
+as importable the way I've written the import block. Worth running once
+with a print(model.definitions.keys()) right after the imports to
+confirm everything you expect is actually registered before the real
+run, so a typo'd competency ID doesn't silently produce empty columns
+instead of an error.
+
+Want me to add that registration sanity-check as a first step in the
+script, so it fails loudly rather than silently if something's missing?
+
+After some chats the last chat that gives the output “run q1 q4 batch
+validation”:
+
+Good catch — that's a real improvement over what I had, and it also
+brings Q1 in line with the paper's own best practice (always scope to
+the named function when it's known, exactly the lesson from bugs #13/#14
+about whole-file over-crediting). Let me update it. Let's verify and
+finalize. All four function names are now confirmed and every question
+is properly function-scoped, no more whole-file resolution anywhere in
+the script:
+
+  -----------------------------------------------------------------------
+  Question                   Function name
+  -------------------------- --------------------------------------------
+  Q1                         search
+
+  Q2                         unique_day
+
+  Q3                         remove_extras
+
+  Q4                         sort_age
+  -----------------------------------------------------------------------
+
+The script should be ready to run on your machine now — REFACTORY_ROOT =
+"C:/data", batch_report.py Version 1 assumed, all target IDs and
+function names confirmed. Run it and send me the printed summary; I'll
+help read the results the way we did for Q5's original scoping
+correction.
