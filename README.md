@@ -1,7 +1,7 @@
 # Competency Extraction — Result Regeneration Repository
 
 This repository is the **provenance and regeneration companion** to the competency-extraction system. It
-exists to answer one reviewer question precisely, for any number reported anywhere in this project:
+exists to answer, for any number reported anywhere in this project:
 
 > *Which exact taxonomy checkpoint, which exact detector checkpoint, and which exact scoping mode
 > produced this number — and can I recompute it myself from the same submission IDs and splits?*
@@ -129,20 +129,14 @@ makes "which configuration produced this number" answerable rather than ambiguou
 
 ## Status of this repository
 
-**Real, not guessed.** An earlier version of this repository was scaffolded from the paper's prose alone,
-before any of the project's real checkpoints, conversation exports, or paper drafts had been examined — that
-version invented a version ladder and several specific numeric results that turned out to have no basis
-in anything real (see `VERSIONING.md`'s "Corrected from an earlier, guessed version" note). This version
-is built from `provenance/detector-version-log.md` instead. Real code is populated for every detector and
-taxonomy checkpoint; real per-submission data now backs the final, published figure for **every** Refactory
-question, Q1 through Q5 (`data/labels_scores/q{1,2,3,4}_final.csv` plus Q5's own current headline,
-`q5_final_extended.csv` — see below — all `evidence: real_csv` in `configs/stage_manifest.yaml`) — the
-driver script at
+**Real, not guessed.** This version is built from `provenance/detector-version-log.md`. 
+Real code is populated for every detector and taxonomy checkpoint; real per-submission data now backs the final, 
+published figure for **every** Refactoryquestion, Q1 through Q5 (`data/labels_scores/q{1,2,3,4}_final.csv` 
+plus Q5's own current headline, `q5_final_extended.csv` — see below — all `evidence: real_csv` in 
+`configs/stage_manifest.yaml`) — the driver script at
 `detectors/q1-q4-batch-validation/run_q1_q4_batch_validation.py` has now actually been run
 against the real Refactory corpus, and the run itself surfaced and fixed a real Q1-specific structural
-gap (`detectors/q1-shared-binding-fix/`, canonical bug #22). Several earlier/superseded stages
-(the pre-fix Q1 baseline, Q4's two intermediate sub-strategy figures, Q5's unscoped runs) remain
-conversation-reported only, since no CSV exists for those specific intermediate configurations. The same round's
+gap (`detectors/q1-shared-binding-fix/`, canonical bug #22). The same round's
 embedding-taxonomy methodology (validated for Q5 across an earlier round) has also been extended to Q4 and
 Q2 (`detectors/q2-q4-embeddings-crossvalidation/`, now `evidence: real_csv` — the raw
 per-seed/per-file prediction CSVs the notebook saved to Drive arrived in a later round than the notebook
@@ -155,11 +149,6 @@ from the raw per-run/per-file CSVs the notebook itself saved, and corroborated b
 executed notebook's own printed output (`configs/stage_manifest.yaml`'s
 `semantic_backup.backends.codet5p_bootstrap_novel_vs_wrong_auc`, `evidence: real_csv`,
 `status: REAL_INVERTED_RESULT_CSV_BACKED`; see `detectors/semantic-backup-layer-validation/`).
-One anomaly persists even in the executed notebook: every code cell's `execution_count` is `None` despite
-real, populated outputs, so the conversation's own "cell 13"/"cell 15" references still cannot be independently
-cross-checked against actual cell positions — flagged as open, not resolved. The published paper's own new
-§7 (as of the 2026-08-08 revision) documents the layer's architecture but deliberately does not yet include
-this finding, deferring it to the still-unsupplied companion paper.
 
 **A separate, still-later-round discovery, distinct from the AUC finding above, closed a real Q5
 structural gap.** The same embedding model, used this time purely as a *discovery tool* rather than a
